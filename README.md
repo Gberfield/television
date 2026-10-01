@@ -3,6 +3,7 @@
 <img src="television-wordmark.png" width=500
      alt="[The Television logo, showing a CRT-style television set tuned to a test pattern]">
 
+[![Built by](https://img.shields.io/badge/Built_by-Telepath-blue.svg)](https://telepath.computer)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/telepath-computer/television/blob/main/LICENSE)
 [![Discord](https://dcbadge.limes.pink/api/server/8MfpZ48jD8?style=flat)](https://discord.gg/8MfpZ48jD8)
 
@@ -21,7 +22,7 @@ To use Television, you must have an agent harness installed. Television works wi
 Simply paste the following prompt into your agent:
 
 ```text
-Use "curl -fsSl https://television.run/install.md" to fetch the television admin guide directly without summarization and then help me get Television installed.
+Read the Television admin guide at https://television.run/install.md and help me get Television installed.
 ```
 
 Your agent will ask you a series of questions and then will set everything up. When it's done, it will give you a link to install our macOS client app. (You'll also get a URL you can use to access your TV from any platform using your browser.)
@@ -59,8 +60,8 @@ Join us on [Discord](https://discord.gg/8MfpZ48jD8) for questions, feedback, and
 
 ## Contributing
 
-Television is open source, but we are not accepting outside contributions just yet. Bug reports and feedback are welcome here on GitHub.
+This project is open source, but uses a spec-driven development process that we haven't opened to outside contributors yet. For now, bug reports and feedback are welcome here on GitHub. If you're interested in contributing, please join our Discord; we'd love to chat.
 
 ## License
 
-[MIT](LICENSE) © 2026 Unternet PBC
+[MIT](LICENSE) © 2026 Telepath (Unternet PBC)
