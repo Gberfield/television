@@ -27,6 +27,7 @@ vi.mock("electron", () => ({
 }));
 
 interface NativeBridge {
+  desktopPlatform: string;
   setAppearanceMode(mode: unknown): void;
   onDesktopUpdateDownloaded(callback: (version: string) => void): void;
   restartToInstallUpdate(): void;
@@ -49,6 +50,11 @@ describe("connect preload native appearance bridge", () => {
     bridge.setAppearanceMode(mode);
 
     expect(mocks.send).toHaveBeenCalledWith(SET_APPEARANCE_MODE_CHANNEL, mode);
+  });
+
+  it("identifies the native platform to the served page without taking it from its URL", () => {
+    const bridge = mocks.exposed.get("__televisionNativeBridge") as NativeBridge;
+    expect(bridge.desktopPlatform).toBe(process.platform);
   });
 
   it.each([undefined, null, "sepia", 1, {}])(

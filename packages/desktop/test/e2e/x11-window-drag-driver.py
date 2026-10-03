@@ -7,7 +7,10 @@ requesting top-level window as XTest pointer motion arrives.
 """
 
 import ctypes
+import json
+import select
 import sys
+import time
 
 
 class ClientMessageData(ctypes.Union):
@@ -91,6 +94,8 @@ x11.XInternAtom.restype = ctypes.c_ulong
 x11.XSelectInput.argtypes = [display_pointer, window_id, ctypes.c_long]
 x11.XSync.argtypes = [display_pointer, ctypes.c_int]
 x11.XNextEvent.argtypes = [display_pointer, ctypes.POINTER(XEvent)]
+x11.XPending.argtypes = [display_pointer]
+x11.XConnectionNumber.argtypes = [display_pointer]
 x11.XGetGeometry.argtypes = [
     display_pointer,
     window_id,
@@ -146,7 +151,10 @@ def move_pointer(display, x, y):
     x11.XSync(display, False)
 
 
-pointer_x, pointer_y, delta_x, delta_y, steps = map(int, sys.argv[1:])
+pointer_x, pointer_y, delta_x, delta_y, steps = map(int, sys.argv[1:6])
+expect_no_request = sys.argv[6:] == ["--expect-no-move-request"]
+if sys.argv[6:] and not expect_no_request:
+    raise ValueError("Unknown drag observation mode")
 display = x11.XOpenDisplay(None)
 if not display:
     raise RuntimeError("XOpenDisplay failed")
@@ -166,6 +174,33 @@ try:
     # Chromium M150 does not ask the window manager to begin moving until the
     # held pointer crosses its drag threshold.
     move_pointer(display, pointer_x + delta_x // steps, pointer_y + delta_y // steps)
+
+    if expect_no_request:
+        # Native-frame Linux content must not request compositor movement.
+        # Complete the real gesture; observe the native root-message seam rather
+        # than treating a stationary Xvfb window without a WM as enough evidence.
+        for step in range(2, steps + 1):
+            move_pointer(display, pointer_x + delta_x * step // steps,
+                         pointer_y + delta_y * step // steps)
+        if xtst.XTestFakeButtonEvent(display, 1, False, 0) == 0:
+            raise RuntimeError("XTestFakeButtonEvent up failed")
+        pressed = False
+        x11.XSync(display, False)
+        deadline = time.monotonic() + 0.5
+        while True:
+            while x11.XPending(display):
+                event = XEvent()
+                x11.XNextEvent(display, ctypes.byref(event))
+                if (event.type == CLIENT_MESSAGE
+                        and event.client.message_type == move_atom
+                        and event.client.data.longs[2] == MOVE_DIRECTION):
+                    raise RuntimeError("Framed page content requested native movement")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            select.select([x11.XConnectionNumber(display)], [], [], remaining)
+        print(json.dumps({"moveRequest": False, "gestureCompleted": True}))
+        sys.exit(0)
 
     while True:
         request = next_event(display, CLIENT_MESSAGE).client

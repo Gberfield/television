@@ -32,3 +32,7 @@ Under [Tests are the validation mechanism](../../../arch/testing-policy.md#Tests
 
 - No chrome: no fixed heading or fixed text beyond the restart button's labels — whoever authors the message authors the rest of the screen.
 - The gate stands over no chrome, on the app's bare ground under the dialog's backdrop ([ui/app/index.md](../index.md#^ap-connection-states)). Nothing renders behind a halted app. In the desktop app, the [system modal](../system-modal/index.md#Interaction)'s drag strip lets the window move.
+
+## Downstream Linux compatibility
+
+A Linux client with no downloaded update uses `content.yml`'s `linux_fallback_instructions` when channel instructions are absent or contain a known ToDesktop `/mac/` installer URL. General and Linux channel instructions are preserved. In known older server bundles the preload may replace only the Mac-link paragraph inside `.desktop-upgrade-gate .upgrade-gate-body`; it must preserve Lit's comment/range boundaries so a later download still renders the shared restart action. Other dialogs and instructions without a Mac installer link remain unchanged.

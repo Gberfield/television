@@ -22,6 +22,13 @@ interface Point {
   readonly appRegion: string;
 }
 
+interface DragDelivery {
+  down: boolean;
+  heldMotion: boolean;
+  up: boolean;
+  dispose(): void;
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const X11_WINDOW_DRAG_DRIVER = path.join(HERE, "x11-window-drag-driver.py");
 const NATIVE_DRAG_TIMEOUT_MS = 5_000;
@@ -29,44 +36,6 @@ const execFileAsync = promisify(execFile);
 
 async function windowBounds(app: ElectronApplication): Promise<WindowBounds> {
   return app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0];
-    if (window === undefined) throw new Error("BrowserWindow missing");
-    return window.getBounds();
-  });
-}
-
-async function armWindowMove(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
-    const owner = globalThis as typeof globalThis & {
-      __app4WindowMove?: { moved: boolean; dispose(): void };
-    };
-    if (owner.__app4WindowMove !== undefined) {
-      throw new Error("window move observation already armed");
-    }
-    const window = BrowserWindow.getAllWindows()[0];
-    if (window === undefined) throw new Error("BrowserWindow missing");
-    const state = {
-      moved: false,
-      dispose: () => window.removeListener("move", onMove),
-    };
-    const onMove = (): void => {
-      state.moved = true;
-    };
-    window.on("move", onMove);
-    owner.__app4WindowMove = state;
-  });
-}
-
-async function movedWindowBounds(app: ElectronApplication): Promise<WindowBounds> {
-  return app.evaluate(({ BrowserWindow }) => {
-    const owner = globalThis as typeof globalThis & {
-      __app4WindowMove?: { moved: boolean; dispose(): void };
-    };
-    const movement = owner.__app4WindowMove;
-    if (movement === undefined) throw new Error("window move observation is not armed");
-    movement.dispose();
-    delete owner.__app4WindowMove;
-    if (!movement.moved) throw new Error("BrowserWindow emitted no move event");
     const window = BrowserWindow.getAllWindows()[0];
     if (window === undefined) throw new Error("BrowserWindow missing");
     return window.getBounds();
@@ -94,7 +63,21 @@ async function dragNativeWindow(
   start: Point,
 ): Promise<{ before: WindowBounds; after: WindowBounds }> {
   const before = await windowBounds(app);
-  await armWindowMove(app);
+  const page = app.windows()[0];
+  await page.evaluate(start => {
+    const owner = window as typeof window & { __linuxDragDelivery?: DragDelivery };
+    const observe = (event: PointerEvent): void => {
+      if (!event.isTrusted) return;
+      if (event.type === "pointerdown" && Math.abs(event.clientX - start.x) <= 2 && Math.abs(event.clientY - start.y) <= 2) state.down = true;
+      if (event.type === "pointermove" && state.down && (event.buttons & 1) !== 0 && Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 8) state.heldMotion = true;
+      if (event.type === "pointerup" && state.down && state.heldMotion) state.up = true;
+    };
+    const events = ["pointerdown", "pointermove", "pointerup"] as const;
+    const state: DragDelivery = { down: false, heldMotion: false, up: false,
+      dispose: () => events.forEach(name => document.removeEventListener(name, observe, true)) };
+    owner.__linuxDragDelivery = state;
+    events.forEach(name => document.addEventListener(name, observe, true));
+  }, start);
   const screenStart = await app.evaluate(({ BrowserWindow }, { start }) => {
     const window = BrowserWindow.getAllWindows()[0];
     if (window === undefined) throw new Error("BrowserWindow missing");
@@ -104,19 +87,33 @@ async function dragNativeWindow(
       y: Math.round(content.y + start.y),
     };
   }, { start });
-  await execFileAsync("python3", [
-    X11_WINDOW_DRAG_DRIVER,
-    String(screenStart.x),
-    String(screenStart.y),
-    "96",
-    "48",
-    "8",
-  ], { timeout: NATIVE_DRAG_TIMEOUT_MS, killSignal: "SIGTERM" });
-  return { before, after: await movedWindowBounds(app) };
+  try {
+    const { stdout } = await execFileAsync("python3", [
+      X11_WINDOW_DRAG_DRIVER,
+      String(screenStart.x),
+      String(screenStart.y),
+      "96",
+      "48",
+      "8",
+      "--expect-no-move-request",
+    ], { timeout: NATIVE_DRAG_TIMEOUT_MS, killSignal: "SIGTERM" });
+    expect(JSON.parse(stdout)).toEqual({ moveRequest: false, gestureCompleted: true });
+    await expect.poll(() => page.evaluate(() => {
+      const state = (window as typeof window & { __linuxDragDelivery?: DragDelivery }).__linuxDragDelivery;
+      return { down: state?.down, heldMotion: state?.heldMotion, up: state?.up };
+    })).toEqual({ down: true, heldMotion: true, up: true });
+  } finally {
+    await page.evaluate(() => {
+      const owner = window as typeof window & { __linuxDragDelivery?: DragDelivery };
+      owner.__linuxDragDelivery?.dispose();
+      delete owner.__linuxDragDelivery;
+    });
+  }
+  return { before, after: await windowBounds(app) };
 }
 
-function expectWindowMoved({ before, after }: { before: WindowBounds; after: WindowBounds }): void {
-  expect(after.x !== before.x || after.y !== before.y).toBe(true);
+function expectWindowStationary({ before, after }: { before: WindowBounds; after: WindowBounds }): void {
+  expect(after).toEqual(before);
 }
 
 async function seedOverflowingTabs(
@@ -137,7 +134,7 @@ async function seedOverflowingTabs(
   }
 }
 
-test("dragging the empty sidebar titlebar and top-bar ground moves the native window", async () => {
+test("Linux page drags leave the framed window stationary beside overflowing tabs", async () => {
   test.skip(process.platform !== "linux", "Native drag driver requires Linux/X11");
   const server = await startConnectTestServer();
   await seedOverflowingTabs(server);
@@ -145,18 +142,18 @@ test("dragging the empty sidebar titlebar and top-bar ground moves the native wi
   try {
     launched = await launchDesktop({
       connectTo: { serverURL: server.serverURL, token: server.token },
+      args: ["--ozone-platform=x11"],
     });
     const { app, page } = launched;
     await expectConnectedPage(page);
     await configureTestMotion(page);
 
-    // Xvfb's display and the BrowserWindow have the same width. With an
-    // overflowing strip, the empty top-bar ground is near the right edge, so
-    // exercise it before the sidebar drag shifts its starting point offscreen.
-    await test.step("empty top-bar ground moves BrowserWindow bounds", async () => {
+    // Keep the overflowing strip's empty ground on screen. Each gesture also
+    // asserts trusted input delivery, so an offscreen target cannot pass.
+    await test.step("empty top-bar ground leaves BrowserWindow bounds unchanged", async () => {
       const topBar = await emptyGround(page, ".top-bar");
       expect(topBar.appRegion).toBe("drag");
-      expectWindowMoved(await dragNativeWindow(app, topBar));
+      expectWindowStationary(await dragNativeWindow(app, topBar));
     });
 
     const strip = page.locator(".tab-strip");
@@ -170,10 +167,10 @@ test("dragging the empty sidebar titlebar and top-bar ground moves the native wi
       Math.abs(element.scrollWidth - element.clientWidth - element.scrollLeft),
     )).toBeLessThanOrEqual(1);
 
-    await test.step("empty sidebar titlebar moves BrowserWindow bounds beside right-scrolled overflow", async () => {
+    await test.step("empty sidebar titlebar leaves BrowserWindow bounds unchanged beside right-scrolled overflow", async () => {
       const sidebarTitlebar = await emptyGround(page, ".sidebar-titlebar");
       expect(sidebarTitlebar.appRegion).toBe("drag");
-      expectWindowMoved(await dragNativeWindow(app, sidebarTitlebar));
+      expectWindowStationary(await dragNativeWindow(app, sidebarTitlebar));
     });
   } finally {
     await launched?.app.close().catch(() => undefined);
@@ -184,10 +181,9 @@ test("dragging the empty sidebar titlebar and top-bar ground moves the native wi
   }
 });
 
-// ^sm-ac-drag-strip, served route: real Electron top-layer hit testing and
-// movement. The X11 driver substitutes the window manager; version and update
-// hooks select the gate and its actionable restart control.
-test("the served gate keeps a native drag strip and usable dialog controls", async () => {
+// ^sm-ac-drag-strip: real Linux top-layer hit testing must not request
+// native movement from framed page content. Version/update hooks select the gate.
+test("the Linux served gate ignores page drags and keeps dialog controls usable", async () => {
   test.skip(process.platform !== "linux", "Native drag driver requires Linux/X11");
   const savedEnv = new Map(["TV_TEST_REQUIRED_DESKTOP_VERSION", "TV_TEST_VERSION", "TV_UPDATE_CHANNEL_URL"].map((key) => [key, process.env[key]]));
   process.env.TV_TEST_VERSION = "1.0.0";
@@ -199,7 +195,7 @@ test("the served gate keeps a native drag strip and usable dialog controls", asy
     launched = await launchDesktop({
       connectTo: { serverURL: server.serverURL, token: server.token },
       env: { TV_TEST_DESKTOP_APP_VERSION: "1.0.0" },
-      args: [SIMULATE_UPDATE_AVAILABLE],
+      args: [SIMULATE_UPDATE_AVAILABLE, "--ozone-platform=x11"],
     });
     const { app, page } = launched;
     await expect(page.locator(".desktop-upgrade-gate")).toBeVisible();
@@ -207,7 +203,7 @@ test("the served gate keeps a native drag strip and usable dialog controls", asy
     expect(await page.locator("dialog").evaluate((dialog) => dialog.matches(":modal"))).toBe(true);
     const strip = await emptyGround(page, ".window-drag-strip");
     expect(strip.appRegion).toBe("drag");
-    expectWindowMoved(await dragNativeWindow(app, strip));
+    expectWindowStationary(await dragNativeWindow(app, strip));
     await expect(page.locator("dialog")).toBeVisible();
     const beforeClick = await windowBounds(app);
     await page.getByRole("button", { name: "Restart to update", exact: true }).click();
@@ -225,17 +221,17 @@ test("the served gate keeps a native drag strip and usable dialog controls", asy
   }
 });
 
-// ^setup-t-drag and ^sm-ac-drag-strip local route: native Electron hit testing
-// and bounds, with the existing X11 window-manager substitute.
-test("packaged setup and saved-error dialogs move the window while controls stay usable", async () => {
+// ^setup-t-drag and ^sm-ac-drag-strip: real Linux hit testing, no native
+// move request, stationary frame and usable local controls.
+test("Linux setup and saved-error page drags leave the frame stationary while controls stay usable", async () => {
   test.skip(process.platform !== "linux", "Native drag driver requires Linux/X11");
   const userDataDir = createUserDataDir();
-  let launched = await launchDesktopConnectScreen({ userDataDir });
+  let launched = await launchDesktopConnectScreen({ userDataDir, args: ["--ozone-platform=x11"] });
   try {
     await waitForConnectScreen(launched.page);
     await configureTestMotion(launched.page);
-    await test.step("setup ground moves and the card edits without moving", async () => {
-      expectWindowMoved(await dragNativeWindow(launched.app, await emptyGround(launched.page, ".setup-screen", ".setup-wallpaper")));
+    await test.step("setup ground stays stationary and the card remains editable", async () => {
+      expectWindowStationary(await dragNativeWindow(launched.app, await emptyGround(launched.page, ".setup-screen", ".setup-wallpaper")));
       const before = await windowBounds(launched.app);
       const input = launched.page.getByRole("textbox", { name: "Link from your agent" });
       await input.click();
@@ -245,13 +241,13 @@ test("packaged setup and saved-error dialogs move the window while controls stay
     });
     await launched.app.close();
     writeFileSync(path.join(userDataDir, "connection.json"), JSON.stringify({ serverURL: "http://127.0.0.1:9", token: "" }));
-    launched = await launchDesktopConnectScreen({ userDataDir });
+    launched = await launchDesktopConnectScreen({ userDataDir, args: ["--ozone-platform=x11"] });
     await expect(launched.page.getByRole("heading", { name: "Can’t connect with server" })).toBeVisible();
     await configureTestMotion(launched.page);
-    await test.step("the modal strip moves and Disconnect remains usable", async () => {
+    await test.step("the modal strip stays stationary and Disconnect remains usable", async () => {
       expect(await launched.page.locator("dialog").evaluate(dialog => dialog.matches(":modal"))).toBe(true);
       const strip = await emptyGround(launched.page, ".window-drag-strip");
-      expectWindowMoved(await dragNativeWindow(launched.app, strip));
+      expectWindowStationary(await dragNativeWindow(launched.app, strip));
       await expect(launched.page.locator("dialog")).toBeVisible();
       const before = await windowBounds(launched.app);
       await launched.page.getByRole("button", { name: "Disconnect from Server", exact: true }).click();

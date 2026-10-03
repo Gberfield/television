@@ -12,6 +12,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
   - `desktop-app.md` (42 lines) — *How the downloaded desktop app's promises are proven: continuous real-Electron tests, and checks of an unreleased ToDesktop build, run by agents or by a person on a real Mac, before a change to the app's behavior reaches `main`.*
   - `keyboard-navigation.md` (32 lines) — *How the promises in Keyboard navigation are proven.*
   - `licensing.md` (30 lines) — *How Television's licensing promises are proven where users receive them: the license gate over the real tree, the packed CLI tarball, the desktop upload directory, the served browser notices, and Electron's license files in the installed desktop app.*
+  - `linux-desktop.md` (45 lines) — *Proves the Linux desktop port at its native process, script and packaged application boundaries.*
   - `tab-pages.md` (29 lines) — *How the promises in Tab pages are proven.*
   - `telemetry.md` (89 lines) — *How the promises in Telemetry are proven.*
   - `themes-and-appearance.md` (55 lines) — *How the promises in Themes and appearance are proven.*
@@ -44,13 +45,14 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `distribution.md` (34 lines) — *How the ToDesktop build's promises are proven: repository checks of the desktop workspace, its ToDesktop configuration, a generated upload directory, the build script's exit status and the real ToDesktop CLI's dry run, and the product's real-host checks for everything ToDesktop does.*
     - `e2e-harness.md` (21 lines) — *How the promises in Electron e2e harness are proven.*
     - `index.md` (28 lines) — *How the desktop architecture root's promises are proven: main-process identity contracts and a real-Electron data-location seam, composed with the module proofs and the product's real-host checks.*
+    - `linux-distribution.md` (45 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
     - `runtime.md` (21 lines) — *How the Electron runtime's promises are proven: exact-version declarations, runtime validity over authored package and runtime trees, and a real cold installation on a Node release known to truncate one.*
     - `updates.md` (28 lines) — *How desktop updates are proven: main-process and preload contracts with Electron and the update runtime replaced by recording mocks, the real Electron app with the runtime in its simulation mode, and the desktop product's update check, which presses the restart in a candidate build on a real Mac.*
   - **layout/**
     - `index.md` (28 lines) — *How the promises in Layout (architecture) are proven.*
     - `migration.md` (39 lines) — *How the promises in The server migration are proven.*
   - **onboarding/**
-    - `bake.md` (82 lines) — *How the onboarding bake is proven at its process boundary and packaged-file output.*
+    - `bake.md` (83 lines) — *How the onboarding bake is proven at its process boundary and packaged-file output.*
     - `content.md` (25 lines) — *How onboarding package validation, runtime source resolution, and the committed welcome document are proven.*
     - `index.md` (23 lines) — *How the promises in Onboarding architecture are proven.*
     - `installer.md` (50 lines) — *How the promises in Onboarding installer are proven.*
@@ -106,7 +108,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - **copy-button/**
       - `index.md` (32 lines) — *How the promises in Copy button (UI) are proven.*
     - **desktop-upgrade-gate/**
-      - `index.md` (22 lines) — *How the promises in Desktop upgrade gate (UI) are proven.*
+      - `index.md` (28 lines) — *How the promises in Desktop upgrade gate (UI) are proven.*
     - **dialog/**
       - `index.md` (24 lines) — *How the promises in Dialog (UI) are proven.*
     - **settings/**
@@ -126,7 +128,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - **update-notification/**
       - `index.md` (27 lines) — *How the promises in Update notification (UI) are proven.*
   - **foundation/**
-    - `index.md` (36 lines) — *How the promises in Foundation (UI) are proven.*
+    - `index.md` (42 lines) — *How the promises in Foundation (UI) are proven.*
     - **button/**
       - `index.md` (15 lines) — *How the promises in Button (UI) are proven.*
     - **checkbox-list/**
@@ -144,7 +146,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
   - **markdown-editor/**
     - `index.md` (19 lines) — *How the Markdown editor’s authoritative color sheet reaches production, and where its exact appearance is judged.*
   - **onboarding-artifacts/**
-    - `index.md` (99 lines) — *How onboarding design sources are proven through the bake and the browser components they use.*
+    - `index.md` (109 lines) — *How onboarding design sources are proven through the bake and the browser components they use.*
   - **setup/**
     - `index.md` (28 lines) — *Setup coverage at the local renderer boundary, with real Electron evidence for connection, confirmation before navigation, agent links, and window dragging.*
   - **skillbench/**

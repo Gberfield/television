@@ -24,3 +24,7 @@ The card wears the [artifact frame](../app/artifact-frame/index.md)'s look, hold
 - Each agent named in the note under the introduction links to that agent's website. A link opens in the default browser through the desktop app's [external-link handling](../../arch/desktop/index.md#External links), and the setup screen stays as it was.
 - Connect, or Return in the field, submits the field when it is not empty.
 - Dragging the background around the card moves the window. The card's contents stay interactive and do not move the window.
+
+## Downstream Linux frame exception
+
+The [Linux native-frame policy](../../product/linux-desktop.md) applies to this surface in downstream Linux builds. Its page content does not move the framed window; movement belongs to the native titlebar or compositor. The page-drag promises above remain the frameless Mac behavior. Linux coverage must observe no page-origin native move request and unchanged window bounds while retaining the surface's interactive controls. That coverage does not establish native titlebar or compositor movement, or Mac movement.

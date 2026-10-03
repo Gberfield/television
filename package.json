@@ -29,6 +29,7 @@
     "build:web-and-artifact-documents": "npm run build:web && npm run build:views && npm run build:canonical",
     "build:cli": "npm --workspace @telepath-computer/television run build",
     "build:desktop": "npm --workspace @telepath-computer/television-desktop run build",
+    "package:linux": "npm --workspace @telepath-computer/television-desktop run package:linux",
     "link": "npm run build && npm link",
     "unlink": "npm unlink -g television-monorepo",
     "lint": "eslint . --ext .ts --max-warnings=0",

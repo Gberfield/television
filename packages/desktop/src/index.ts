@@ -8,7 +8,7 @@ import {
   type MenuItemConstructorOptions,
 } from "electron";
 import { classifyLinkTarget } from "@telepath-computer/television-artifact/link-target";
-import todesktop from "@todesktop/runtime";
+import { startDesktopUpdates } from "./update-runtime.ts";
 import path from "node:path";
 import { buildRemoteURL, ConnectURLError, parseDesktopConnectURL, resolveDesktopAppVersion } from "./connect-url.ts";
 import { preflightConnection } from "./connect-preflight.ts";
@@ -34,7 +34,6 @@ import { OPEN_APPLICATION_LINK_CHANNEL } from "./application-link.ts";
 import {
   DESKTOP_UPDATE_DOWNLOADED_CHANNEL,
   GET_DESKTOP_UPDATE_CHANNEL,
-  isDesktopUpdateVersion,
   RESTART_TO_INSTALL_UPDATE_CHANNEL,
 } from "./desktop-update.ts";
 
@@ -42,16 +41,23 @@ import {
 // starts straight after, with its system notification off: the served
 // interface tells the user (specs/arch/desktop/updates.md#^desktop-updates-start).
 app.setName("Television");
-todesktop.init({ updateReadyAction: { showNotification: "never" } });
+if (process.platform === "linux" && app.commandLine) {
+  if (!app.commandLine.hasSwitch("class")) app.commandLine.appendSwitch("class", "computer.telepath.television");
+  if (!app.commandLine.hasSwitch("ozone-platform")) {
+    const requested = process.env.TV_OZONE_PLATFORM;
+    const backend = requested === "wayland" || requested === "x11" || requested === "auto"
+      ? requested : process.env.WAYLAND_DISPLAY ? "wayland" : "x11";
+    app.commandLine.appendSwitch("ozone-platform", backend);
+  }
+}
 
 // The downloaded update's version, for the life of the process
 // (specs/arch/desktop/updates.md#^desktop-updates-record). The runtime emits
 // the event again after every later check while the update waits, so only a
 // new version is reported to the window.
 let downloadedUpdateVersion: string | null = null;
-todesktop.autoUpdater?.on("update-downloaded", ({ updateInfo }) => {
-  const version = updateInfo?.version;
-  if (!isDesktopUpdateVersion(version) || version === downloadedUpdateVersion) return;
+const updateRuntime = startDesktopUpdates(version => {
+  if (version === downloadedUpdateVersion) return;
   downloadedUpdateVersion = version;
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(DESKTOP_UPDATE_DOWNLOADED_CHANNEL, version);
@@ -120,7 +126,7 @@ function restartToInstallUpdate(): void {
     const globalState = globalThis as typeof globalThis & { __televisionRestartToInstallLog?: string[] };
     (globalState.__televisionRestartToInstallLog ??= []).push(downloadedUpdateVersion);
   } else {
-    todesktop.autoUpdater?.restartAndInstall();
+    updateRuntime.restartAndInstall();
   }
 }
 
@@ -143,6 +149,14 @@ export class App {
         version: "",
       });
       app.dock?.setIcon(path.join(__dirname, "..", "assets", "icon.png"));
+    } else {
+      app.setDesktopName?.("computer.telepath.television.desktop");
+      app.setAboutPanelOptions({
+        applicationName: "Television",
+        applicationVersion: app.getVersion(),
+        version: "",
+        iconPath: path.join(__dirname, "..", "assets", "icon.png"),
+      });
     }
     nativeTheme.themeSource = "system";
     this.connection = loadConnection();
@@ -157,14 +171,13 @@ export class App {
     ipcMain.handle(CONNECT_CHANNEL, async (_event, link: string) => this.tryConnect(link));
     ipcMain.handle(COMPLETE_CONNECT_CHANNEL, async (_event, attempt: number) => this.completeConnect(attempt));
     ipcMain.handle(DISCONNECT_CHANNEL, async () => this.disconnect());
-    await this.createWindow();
-
     app.on("window-all-closed", () => {
       if (process.platform !== "darwin") app.quit();
     });
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
     });
+    await this.createWindow();
   }
 
   private async createWindow(): Promise<void> {
@@ -175,10 +188,13 @@ export class App {
       height: WINDOW_HEIGHT,
       minWidth: WINDOW_MIN_WIDTH_PX,
       minHeight: WINDOW_MIN_HEIGHT_PX,
-      show: false,
+      // A hidden Wayland surface may not receive the first compositor paint,
+      // so ready-to-show cannot be the prerequisite for making Linux visible.
+      show: process.platform === "linux",
       backgroundColor: "#000000",
-      titleBarStyle: "hidden",
-      trafficLightPosition: TRAFFIC_LIGHT_POSITION,
+      ...(process.platform === "darwin"
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: TRAFFIC_LIGHT_POSITION }
+        : { titleBarStyle: "default" as const }),
       webPreferences: {
         contextIsolation: true,
         preload: path.join(__dirname, "connect-preload.cjs"),
@@ -233,7 +249,15 @@ export class App {
     this.setConnectState(this.connection
       ? { kind: "connecting", serverURL: this.connection.serverURL }
       : { kind: "setup" });
-    await this.window.loadFile(path.join(__dirname, "connect.html"));
+    const window = this.window;
+    try {
+      await window.loadFile(path.join(__dirname, "connect.html"));
+    } catch (error) {
+      // A closed/replaced window or a newer connection attempt owns its own
+      // navigation. Cancellation of this stale load is not a startup error.
+      if (this.window !== window || attempt !== this.attempt) return;
+      throw error;
+    }
     if (attempt === this.attempt && this.connection) void this.checkSavedConnection(attempt);
   }
 
@@ -383,6 +407,7 @@ export class App {
       {
         label: "File",
         submenu: [
+          ...(isMac ? [] : [{ role: "about" as const }, { type: "separator" as const }]),
           ...(isMac ? [] : [connectItem]),
           isMac ? { role: "close" } : { role: "quit" },
         ],

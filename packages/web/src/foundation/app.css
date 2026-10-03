@@ -149,3 +149,9 @@
      before its first control. */
   --traffic-light-x-reserve: 72px;
 }
+
+/* Linux uses its native window frame; the preload also supplies this
+   exception when connected to an older server bundle. */
+:root[data-platform="electron"][data-desktop-platform="linux"] {
+  --traffic-light-x-reserve: 0px;
+}

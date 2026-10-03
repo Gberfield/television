@@ -57,7 +57,8 @@ export class DesktopUpgradeGate extends View<[DesktopUpgradeInstructions | null,
       <div class="desktop-upgrade-gate" ${ref(this.#rootRef)}>
         ${dialogTemplate(
           html`<div class="upgrade-gate-body" data-testid="upgrade-gate-body">${unsafeHTML(
-            renderMarkdown(selectGateInstructions(instructions, version !== null)),
+            renderMarkdown(selectGateInstructions(instructions, version !== null,
+              (globalThis as typeof globalThis & { __televisionNativeBridge?: { desktopPlatform?: string } }).__televisionNativeBridge?.desktopPlatform)),
           )}</div>${version === null
             ? nothing
             : html`<div class="upgrade-gate-actions"><button

@@ -77,3 +77,7 @@ Dragging empty navbar space moves the native window. Tabs and controls remain in
 ## Testing
 
 Prove native window dragging in the real Electron app by dragging empty navbar space and observing the window move.
+
+## Downstream Linux frame exception
+
+The [Linux native-frame policy](../../../product/linux-desktop.md) applies to this surface in downstream Linux builds. Its page content does not move the framed window; movement belongs to the native titlebar or compositor. The page-drag promises above remain the frameless Mac behavior. Linux coverage must observe no page-origin native move request and unchanged window bounds while retaining the surface's interactive controls. That coverage does not establish native titlebar or compositor movement, or Mac movement.
