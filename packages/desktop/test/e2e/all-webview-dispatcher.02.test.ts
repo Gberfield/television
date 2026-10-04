@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node
 import { createServer as createHTTPServer, type Server as HTTPServer } from "node:http";
 import path from "node:path";
 import { createApplicationProtocolHandler } from "../../../../test/helpers/application-protocol-handler.ts";
-import { createUserDataDir, desktopE2EOrigin, launchDesktop } from "./helpers.ts";
+import { clickVisibleWebviewLink, createUserDataDir, desktopE2EOrigin, launchDesktop } from "./helpers.ts";
 import { test, expect } from "../../../../test/helpers/playwright.ts";
 import { launchProductServer, type ProductServer } from "../../../../test/helpers/product-server.ts";
 
@@ -503,8 +503,9 @@ test.describe("Electron all-webview dispatcher", () => {
       await expect.poll(() => webviewHasSelector(runningApp, linkSelector), { timeout: 15_000 }).toBe(true);
       const initialURL = await webviewURL(runningApp);
 
-      await realClickInWebview(runningApp, linkSelector);
-      await realClickInWebview(runningApp, linkSelector, "middle");
+      await clickVisibleWebviewLink(runningApp, page, linkSelector);
+      await expect.poll(() => handler.readInvocations(), { timeout: 15_000 }).toEqual([applicationURL]);
+      await clickVisibleWebviewLink(runningApp, page, linkSelector, "middle");
 
       await expect.poll(() => handler.readInvocations(), { timeout: 15_000 }).toEqual([
         applicationURL,
