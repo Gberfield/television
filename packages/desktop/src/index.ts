@@ -204,6 +204,8 @@ export class App {
     this.window.webContents.on("will-attach-webview", (_event, webPreferences) => {
       webPreferences.preload = path.join(__dirname, "webview-bridge-preload.cjs");
       webPreferences.contextIsolation = false;
+      // Let each document paint its native light/dark canvas beneath authored CSS.
+      webPreferences.transparent = false;
     });
     this.window.webContents.on("did-fail-load", (_event, code, _description, validatedURL, isMainFrame) => {
       if (!isMainFrame) return;
