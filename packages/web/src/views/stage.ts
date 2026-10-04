@@ -317,6 +317,9 @@ export class Stage extends View<[
     this.#resizeObserver = new ResizeObserver(() => {
       const nextPageBox = this.#measurePageBox(filmstrip);
       if (!sameSize(nextPageBox, this.#lastPageBox)) {
+        // A crossing's target belongs to the old page box. Window tracking
+        // must centre immediately rather than finish scrolling to that target.
+        this.#cancelCrossing();
         this.#beginWindowTracking();
         if (this.#activeResize) this.#finishResize(false);
         this.#applyRenderedSizes(filmstrip);
