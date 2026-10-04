@@ -156,7 +156,10 @@ function findPackageJson(root) {
       else if (entry.name === "package.json") out.push(full);
     }
   };
-  visit(root);
+  for (const includeRoot of CANONICAL_TEST_INCLUDE_ROOTS) {
+    const absoluteRoot = path.join(root, includeRoot);
+    if (fs.existsSync(absoluteRoot)) visit(absoluteRoot);
+  }
   return out;
 }
 

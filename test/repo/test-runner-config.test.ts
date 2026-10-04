@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
@@ -9,6 +9,28 @@ const config = loadTestConfig();
 describe("test runner registry", () => {
   test("validates the repository registry", () => {
     expect(validateRegistry(config)).toEqual([]);
+  });
+
+  // proofs/arch/test-runner/test-registry.md#^registry-package-canonical-roots
+  test("resolves package cwd only inside canonical include roots", () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "tv-test-package-discovery-"));
+    try {
+      // Real manifests supply all package names required by the loaded registry.
+      for (const surface of config.surfaces) {
+        if (!surface.package) continue;
+        const directory = path.join(root, surface.cwd);
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(path.join(directory, "package.json"), JSON.stringify({ name: surface.package }));
+      }
+      const shadow = path.join(root, "prototypes/shadow");
+      mkdirSync(shadow, { recursive: true });
+      writeFileSync(path.join(shadow, "package.json"), JSON.stringify({ name: "@telepath-computer/canonical" }));
+
+      const loaded = loadTestConfig({ root });
+      expect(selectSurfaces(loaded, { surface: "unit:canonical" })[0].cwd).toBe("packages/canonical");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("e2e:node preCommand uses the shared licensing product build", () => {

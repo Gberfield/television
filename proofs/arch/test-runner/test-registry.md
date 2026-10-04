@@ -15,6 +15,7 @@ Coverage declarations are carried inside the migrated assertion blocks below.
 These run in-process as pure functions over the loaded registry, plus real filesystem reads (discovery walks the real repository tree, and validation cases write throwaway configs into real temp directories). There is no subprocess, network, or remote boundary in the registry, so no boundary is left unproven by mocking — the gap class that `testing-policy.md` warns about does not arise here. Current coverage lives in `test/repo/test-runner-config.test.ts`.
 
 - `validateRegistry` returns no errors for the repository's own registry.
+- **Contract** (real temporary filesystem; package manifests for the registry's workspace packages and a same-name manifest under `prototypes/`, no mocks): `loadTestConfig` resolves the canonical package's working directory from the [canonical include roots](../../../specs/arch/test-runner/test-registry.md#discovery-and-validation). The outside manifest cannot shadow that package. Covered by `test/repo/test-runner-config.test.ts`, “resolves package cwd only inside canonical include roots”. This proves discovery scope, not every possible concurrent filesystem mutation. ^registry-package-canonical-roots
 - `selectSurfaces` with `suite: "e2e"` returns only `kind === "e2e"` surfaces.
 - `selectSurfaces` with `package: "@telepath-computer/television-web"` returns exactly `unit:browser-app` and `e2e:browser-app`.
 - `selectSurfaces` with `package: "@telepath-computer/canonical"` returns exactly `unit:canonical`.
@@ -35,4 +36,3 @@ These run in-process as pure functions over the loaded registry, plus real files
 - The `unit:build-config` surface owns `test/repo/build-config-integrity.test.ts`; `unit:root` excludes that file.
 - The `telemetry-posthog-roundtrip` suite resolves to the `telemetry-posthog-roundtrip:integration` surface, and that surface owns `packages/server/test/telemetry-posthog.integration.test.ts`; `unit:server` excludes that file.
 - The `daemon-acceptance` suite resolves to `daemon-acceptance:cli`, and that surface exclusively owns `test/node/daemon-acceptance.test.ts`; `e2e:node` excludes that file. The surface declares the `daemon-test-host` preflight and is absent from `all`.
-
