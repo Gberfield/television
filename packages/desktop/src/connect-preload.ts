@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { installLinuxGateCompatibility } from "./linux-gate-compatibility.ts";
 import type { ConnectResult } from "./connect-error.ts";
 import {
   GET_CONNECT_STATE_CHANNEL, CONNECT_STATE_CHANNEL, COMPLETE_CONNECT_CHANNEL, DISCONNECT_CHANNEL,
@@ -20,6 +21,7 @@ import {
 } from "./desktop-update.ts";
 
 contextBridge.exposeInMainWorld("__televisionNativeBridge", {
+  desktopPlatform: process.platform,
   onNavigationKey(callback: (key: string) => void): void {
     ipcRenderer.on(NATIVE_NAVIGATION_KEY_CHANNEL, (_event, key: unknown) => {
       if (isNativeNavigationKey(key)) callback(key);
@@ -47,6 +49,19 @@ contextBridge.exposeInMainWorld("__televisionNativeBridge", {
     ipcRenderer.send(RESTART_TO_INSTALL_UPDATE_CHANNEL);
   },
 });
+
+// Linux uses the compositor's native frame, so the app content needs no
+// room for the Mac traffic-light cluster. Inline custom properties survive
+// the server page's stylesheet and theme loading without changing its UI.
+if (process.platform !== "darwin") {
+  const applyChrome = (): void => {
+    document.documentElement.setAttribute("data-desktop-platform", process.platform);
+    document.documentElement.style.setProperty("--traffic-light-x-reserve", "0px");
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", applyChrome, { once: true });
+  else applyChrome();
+  if (process.platform === "linux") installLinuxGateCompatibility(document);
+}
 
 if (window.location.protocol === "file:") {
   contextBridge.exposeInMainWorld("television", {

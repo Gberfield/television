@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install Television
+Comment=Install Television in your user applications
+Exec=bash -c "exec \\"\\$(dirname \\"\\$1\\")/install-television\\" --gui" television-install %k
+Icon=system-software-install
+Terminal=false
+Categories=Utility;

@@ -39,9 +39,14 @@ const CHANNEL_VERSION = "1.1.0";
 // Channel-authored instructions start from the gate's built-in text; the
 // release-specific heading tells them apart from it.
 const GATE_HEADING = "Desktop app update required for the journey release";
+// Use a platform-appropriate channel instruction. Linux deliberately replaces
+// the known Mac-only channel; its compatibility is exercised by the gate tests.
+const GATE_DOWNLOAD = process.platform === "linux"
+  ? "[Download the Linux build](https://example.com/Television-linux.AppImage)"
+  : "[Download the latest version for Mac](https://dl.todesktop.com/260923p52umxx/mac/dmg/arm64)";
 const GATE_MARKDOWN =
   `# ${GATE_HEADING}\n\n` +
-  "This version of the Television desktop app does not work with this server and needs to be updated. [Download the latest version for Mac](https://dl.todesktop.com/260923p52umxx/mac/dmg/arm64) and install it.";
+  `This version of the Television desktop app does not work with this server and needs to be updated. ${GATE_DOWNLOAD} and install it.`;
 const TOAST_MARKDOWN = `**Television ${CHANNEL_VERSION}** has shipped — [journey notes](https://television.run/journey-notes).`;
 const PROMPT = "Agent, please upgrade this Television server for the journey.";
 const BANNED_CONTENT = [

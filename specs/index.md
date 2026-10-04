@@ -21,6 +21,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
   - `desktop-app.md` (60 lines) — *The desktop application users download: its Mac installer and download link, the platforms it supports, Television identity and saved data, and the npm package that distributed releases through 1.3.x.*
   - `keyboard-navigation.md` (51 lines) — *How the keyboard moves through the app: the navigation chord that steps between tab pages and between channels, where it always works, and the one place it can't.*
   - `licensing.md` (109 lines) — *Television's licensing promises: the project is MIT and every published package and the desktop application say so, every shipped artifact carries the licenses and attributions of the third-party code and assets it redistributes, and the standard test suites block unacceptably-licensed dependencies from shipping.*
+  - `linux-desktop.md` (15 lines) — *The downstream Linux desktop's platform behavior, compatibility and host acceptance requirements.*
   - `tab-pages.md` (60 lines) — *What tab pages promise the user: one tab per page of the focused channel, labeled by its artifact, stepped through by tab or keyboard, with selection private to each browser.*
   - `telemetry.md` (325 lines) — *Anonymous, opt-out product telemetry: what Television measures about how early users use it, the privacy guarantees that bound what is collected, and the disclosure and opt-out behavior users get.*
   - `themes-and-appearance.md` (125 lines) — *Themes and appearance: how people choose a server-wide installed theme, use its CSS and JavaScript visual surfaces, grant per-theme consent for main-page JavaScript, and set the light, dark, or system preference that the active theme resolves into appearance.*
@@ -56,13 +57,14 @@ Generated from the first-line description of every spec by `scripts/specs-index.
     - `distribution.md` (100 lines) — *The ToDesktop build of the desktop app: the private workspace, the ToDesktop configuration and build target, the upload directory, the build script, candidate and test builds, desktop releases, and the download link.*
     - `e2e-harness.md` (101 lines) — *The Electron end-to-end harness: preparing the exact runtime, planning its Linux environment, handing a validated executable to Playwright, launching the package, and proving real-Electron seams.*
     - `index.md` (59 lines) — *The desktop architecture root: server connection, appearance, the ToDesktop build, the app's updates, the Electron runtime for development and tests, the test harness, and main-process identity.*
+    - `linux-distribution.md` (17 lines) — *Linux packaging, installation, launch identity, sandbox requirements and update-feed ownership.*
     - `runtime.md` (86 lines) — *The Electron runtime for development runs and tests: its exact version and declarations, installed-file validity on development and test hosts, how those hosts obtain it, and the recurring major-upgrade procedure.*
     - `updates.md` (47 lines) — *Desktop updates: how the main process starts ToDesktop's update runtime, records a downloaded update, tells the served interface about it, and restarts the app to install it.*
   - **layout/**
     - `index.md` (91 lines) — *The layout architecture: the data model for what a channel shows — its ordered tab pages — plus the stored format's versioning and the semantics of layout updates; the migration from version 1 is [arch/layout/migration.md](arch/layout/migration.md)'s.*
     - `migration.md` (101 lines) — *The server migration: the one boot-time migration that carries a stored data directory across everything the redesign changes on disk — the screen-to-channel names, the version-1 card-tree layouts flattened into version-2 tab pages, the onboarding marker slimmed to its slug, the redesigned display record, the page-size backfill, and the required appearance preference.*
   - **onboarding/**
-    - `bake.md` (174 lines) — *How onboarding reference frames become complete artifact documents in Television's release bundle.*
+    - `bake.md` (187 lines) — *How onboarding reference frames become complete artifact documents in Television's release bundle.*
     - `content.md` (142 lines) — *Onboarding content and server packaging: the bundled content tree under `packages/server/assets/onboarding-channels/`, the onboarding config schema that orders channels and artifacts, slug rules, and server build-time validation.*
     - `index.md` (38 lines) — *The onboarding architecture root: bundled content and build validation, the design bake, the per-data-directory installer, and the contracts this feature imposes on architecture modules that do not yet have their own specs.*
     - `installer.md` (168 lines) — *The onboarding installer: the per-data-directory onboarding state file at `state/onboarding.json` (v3 schema, migration from screen-named v2 state and the legacy sentinel), the boot-time per-channel install loop with deterministic IDs and crash-safe idempotency, initial one-artifact tab pages, the onboarding channel marker on the `Channel` DTO, the focus rule, and the default-channel invariant.*
@@ -82,7 +84,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
     - `attestation.md` (132 lines) — *Tree-hash test attestation: recording that an exact tree passed full validation as a bare `refs/testpass/<version>/<tree-hash>` ref, and letting validation-bearing CI runs skip their heavy test jobs — never their cheap ones — when the identical tree is already attested under the current version.*
     - `blaxel-testshards.md` (121 lines) — *The Blaxel shard coordinator: leasing a persistent sandbox pool, sourcing a GitHub token, preparing and locking workers, running shards with dependency-hash caching, and classifying Blaxel shard outcomes.*
     - `flaky-tests.md` (74 lines) — *The flaky-test policy: the runner's retry budget, the per-test `FLAKY_TEST_RETRIES` annotation, and how recovered flakes are surfaced.*
-    - `github-ci.md` (137 lines) — *The GitHub Actions CI execution contract: PR concurrency, per-job dependency and browser environment, build-once fan-out with an artifact manifest, cleanup tool prerequisites, worker counts, and the retirement record for the Blacksmith-dispatched shard provider.*
+    - `github-ci.md` (139 lines) — *The GitHub Actions CI execution contract: PR concurrency, per-job dependency and browser environment, build-once fan-out with an artifact manifest, cleanup tool prerequisites, worker counts, and the retirement record for the Blacksmith-dispatched shard provider.*
     - `preflight.md` (92 lines) — *The checks the test runner runs before tests: local capability checks for the selected surfaces, and the git-safety and provider-auth checks that gate a committed-revision remote run.*
     - `reporting.md` (411 lines) — *The run directory, normalized reports, timing events, and CI run artifacts every test run produces.*
     - `sharded-execution.md` (341 lines) — *The shared remote execution model: deterministic duration-aware plans, per-worker execution, provider reports, retries, and normalization.*
@@ -120,23 +122,23 @@ Generated from the first-line description of every spec by `scripts/specs-index.
     - **copy-button/**
       - `index.md` (45 lines) — *UI spec: the copy button — a control that copies a value and briefly confirms, without resizing.*
     - **desktop-upgrade-gate/**
-      - `index.md` (34 lines) — *UI spec: the desktop upgrade gate screen — the blocking surface a gated desktop app renders instead of the interface.*
+      - `index.md` (38 lines) — *UI spec: the desktop upgrade gate screen — the blocking surface a gated desktop app renders instead of the interface.*
     - **dialog/**
       - `index.md` (46 lines) — *UI spec: the dialog — the panel that interrupts the screen for an important decision or issue.*
     - **settings/**
       - `index.md` (32 lines) — *UI spec: settings — the navbar trigger and popover for the server-wide theme and appearance preference.*
     - **sidebar/**
-      - `index.md` (78 lines) — *UI spec: the channel sidebar — the narrow region down the left of the window; its interaction, markup, and styling.*
+      - `index.md` (82 lines) — *UI spec: the channel sidebar — the narrow region down the left of the window; its interaction, markup, and styling.*
     - **skill-selector/**
       - `index.md` (38 lines) — *UI spec: the skill selector — the navbar trigger and the skills popover; its interaction, markup, and styling.*
     - **stage/**
       - `index.md` (135 lines) — *UI spec: the stage — the region artifacts are shown in, and the filmstrip of pages it holds.*
     - **system-modal/**
-      - `index.md` (30 lines) — *UI spec: the system modal — the dialog that interrupts Television while it cannot use a server, its contents by state.*
+      - `index.md` (34 lines) — *UI spec: the system modal — the dialog that interrupts Television while it cannot use a server, its contents by state.*
     - **tab-strip/**
       - `index.md` (60 lines) — *UI spec: the tab strip — the row of open artifacts, and the tab that stands for each.*
     - **top-bar/**
-      - `index.md` (79 lines) — *UI spec: the navbar — artifact tabs and application controls.*
+      - `index.md` (83 lines) — *UI spec: the navbar — artifact tabs and application controls.*
     - **update-notification/**
       - `index.md` (50 lines) — *UI spec: the update notification — the navbar bell and the notice popover; its interaction, markup, and styling.*
   - **foundation/**
@@ -158,9 +160,9 @@ Generated from the first-line description of every spec by `scripts/specs-index.
   - **markdown-editor/**
     - `index.md` (29 lines) — *UI spec: the Markdown editor’s color treatment across rendered Markdown, source-reveal states, editing affordances, and interactive tables.*
   - **onboarding-artifacts/**
-    - `index.md` (227 lines) — *UI spec: four designed onboarding channels and their artifacts — the design-source markup, styling, content, and shared conventions.*
+    - `index.md` (238 lines) — *UI spec: four designed onboarding channels and their artifacts — the design-source markup, styling, content, and shared conventions.*
   - **setup/**
-    - `index.md` (26 lines) — *UI spec: the setup screen — the desktop app's connect screen when it has no saved server connection, where a person pastes the link their agent gives them.*
+    - `index.md` (30 lines) — *UI spec: the setup screen — the desktop app's connect screen when it has no saved server connection, where a person pastes the link their agent gives them.*
   - **skillbench/**
     - `index.md` (26 lines) — *UI spec: skillbench — the eval review page's interaction, markup, and styling.*
   - **skills/**

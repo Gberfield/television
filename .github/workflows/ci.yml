@@ -221,6 +221,17 @@ jobs:
             || echo "::warning::electron-readiness phase metric recorder crashed"
           exit "$status"
 
+      - name: Assert or install Linux desktop entry validator
+        if: ${{ (needs.attest-check.outputs.skip != 'true' || needs.attest-check.outputs.authorized != 'true') && matrix.suite.name == 'unit' }}
+        run: |
+          if ! command -v desktop-file-validate >/dev/null 2>&1; then
+            echo "Installing desktop-file-utils for Linux installer validation"
+            sudo -v || exit 1
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends desktop-file-utils
+          fi
+          command -v desktop-file-validate
+
       - name: Run ${{ matrix.suite.name }}
         if: ${{ (needs.attest-check.outputs.skip != 'true' || needs.attest-check.outputs.authorized != 'true') }}
         run: ${{ matrix.suite.cmd }}

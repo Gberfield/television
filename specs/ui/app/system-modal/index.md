@@ -28,3 +28,7 @@ The dialog shows in three places, which the frame's `context` parameter names: t
 ## Appearance
 
 The interior is centred: the icon over the title where the state has one, the supporting lines beneath, and the button, if any, last, at a fixed width that gives way only when the window is narrower ([system-modal.frame](./system-modal.frame) states the measure). Whether the interface shows dimmed behind the dialog is the [app shell](../index.md#Connection states)'s.
+
+## Downstream Linux frame exception
+
+The [Linux native-frame policy](../../../product/linux-desktop.md) applies to this surface in downstream Linux builds. Its page content does not move the framed window; movement belongs to the native titlebar or compositor. The page-drag promises above remain the frameless Mac behavior. Linux coverage must observe no page-origin native move request and unchanged window bounds while retaining the surface's interactive controls. That coverage does not establish native titlebar or compositor movement, or Mac movement.

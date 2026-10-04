@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Television
+Comment=Visual artifacts for your personal agent
+Exec=/opt/television/television-launcher %U
+Icon=computer.telepath.television
+Terminal=false
+Categories=Utility;Development;
+StartupWMClass=computer.telepath.television

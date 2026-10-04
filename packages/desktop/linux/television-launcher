@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+app_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+platform_args=()
+explicit_platform=false
+for arg in "$@"; do
+  case "$arg" in --ozone-platform|--ozone-platform=*) explicit_platform=true ;; esac
+done
+if [[ "$explicit_platform" == false ]]; then
+  backend="${TV_OZONE_PLATFORM:-}"
+  if [[ -z "$backend" ]]; then
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then backend=wayland; else backend=x11; fi
+  fi
+  case "$backend" in wayland|x11|auto) ;; *) echo "TV_OZONE_PLATFORM must be wayland, x11 or auto" >&2; exit 2 ;; esac
+  platform_args=("--ozone-platform=$backend")
+fi
+exec "$app_dir/television" "${platform_args[@]}" "$@"

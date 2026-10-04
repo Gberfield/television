@@ -1,0 +1,29 @@
+# Television for Linux
+
+This is a downstream Linux build of Television 1.4.23. It uses the same Electron app as the Mac version and bundles its runtime. Target: x86_64 Omarchy/Arch Linux with Hyprland/Wayland; X11 also works. The client connects to the Television server beside your agent, which may run on this machine or a remote one.
+
+## Open or install
+
+For the portable archive, extract the whole archive in your file manager. Open **Install Television.desktop** (allow execution/trust in your file manager when prompted), then open **Television** from the application launcher. You can also open **television-launcher** in the extracted folder directly. The graphical installer needs no administrator privileges and preserves saved Television connections. Some file managers require enabling executable files before double-clicking them.
+
+For the AppImage, mark it executable in file Properties and open it. A FUSE-compatible AppImage runtime is normally available on Omarchy; the portable archive is available when FUSE is unavailable. This app does not disable Chromium's sandbox. User-installed builds require an OS that permits unprivileged user namespaces; the Arch package installs the standard root-owned setuid sandbox instead.
+
+Give your agent this prompt: “Install the Television server using https://television.run/install.md and give me its connect link. I already have the Linux desktop client.” Paste that one link into the app. Your agent needs access to the server's files; installing this client does not install an agent or copy cloud data to your laptop.
+
+Use **File → Disconnect from Server** or **Ctrl+,** to change servers. The app reconnects to the saved server on launch. **File → About Television** shows its version. Channels, HTML/Markdown artifacts, embedded websites, tabs, themes, settings and Ctrl-based shortcuts use the shared Television implementation.
+
+## Omarchy
+
+The launcher chooses native Wayland whenever `WAYLAND_DISPLAY` is present. Hyprland receives app identity `computer.telepath.television`. The desktop entry works with Omarchy's application launcher and ordinary Hyprland window bindings. An agent can set `TV_OZONE_PLATFORM=x11` for XWayland troubleshooting or pass `--ozone-platform=x11`; the launcher preserves explicit flags. No theme files, Hyprland bindings, system services or existing applications are changed by installation.
+
+Move the Linux window using its native titlebar or compositor bindings. Unlike the frameless Mac window, page content such as the sidebar/top-bar and modal strips does not drag the framed Linux window. Physical titlebar dragging and keyboard input need host acceptance independently of programmatic window operations.
+
+## Updates
+
+This build has no maintained Linux release feed configured. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
+
+## Build and package (for agents/maintainers)
+
+Use Node 24 and npm >=11.5 <12. From the source root run `npm ci`, install Electron's exact runtime with `node node_modules/electron/install.js`, then `npm run package:linux`. `TV_LINUX_OUTPUT_DIR` selects the output folder. The build produces AppImage, portable tar.gz, hashes and an `arch/` folder. On Arch, an agent can run `makepkg -si` inside `arch/`; no AUR publication is claimed.
+
+Strict packaged host tests use `TV_LINUX_REQUIRE_SANDBOX=1` so the generic cloud test fallback cannot disable the sandbox. The acceptance record distinguishes native Wayland/X11, enabled-sandbox and AppImage launch checks from physical-input, GPU/fractional-scale and production-update checks. A browser walkthrough cannot execute the Linux binary. MIT license and Electron/Chromium notices are included.

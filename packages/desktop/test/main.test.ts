@@ -12,6 +12,7 @@ type BrowserWindowOptions = {
   icon?: string;
   minWidth?: number;
   minHeight?: number;
+  show?: boolean;
   titleBarStyle?: string;
   trafficLightPosition?: { x: number; y: number };
   webPreferences?: {
@@ -49,6 +50,7 @@ const mockState = vi.hoisted(() => {
   const ipcHandlers = new Map<string, IpcHandler>();
   const ipcListeners = new Map<string, IpcListener>();
   let autoEmitReadyToShowOnLoad = false;
+  let loadFileBehavior: ((window: MockBrowserWindow) => Promise<void>) | undefined;
 
   class MockBrowserWindow {
     static instances: MockBrowserWindow[] = [];
@@ -57,10 +59,11 @@ const mockState = vi.hoisted(() => {
       if (autoEmitReadyToShowOnLoad) this.emitOnce("ready-to-show");
     });
     loadFile = vi.fn(async (_file: string) => {
+      if (loadFileBehavior) return loadFileBehavior(this);
       if (autoEmitReadyToShowOnLoad) this.emitOnce("ready-to-show");
     });
     show = vi.fn();
-    webContents = { on: vi.fn(), send: vi.fn() };
+    webContents = { on: vi.fn(), send: vi.fn(), stop: vi.fn() };
 
     constructor(options: BrowserWindowOptions) {
       this.options = options;
@@ -71,7 +74,9 @@ const mockState = vi.hoisted(() => {
       onceHandlers.set(event, handler);
     }
 
-    on(_event: string, _handler: () => void): void {}
+    private handlers = new Map<string, () => void>();
+    on(event: string, handler: () => void): void { this.handlers.set(event, handler); }
+    emit(event: string): void { this.handlers.get(event)?.(); }
 
     emitOnce(event: string): void {
       const handler = onceHandlers.get(event);
@@ -145,6 +150,7 @@ const mockState = vi.hoisted(() => {
     setAutoEmitReadyToShowOnLoad: (value: boolean) => {
       autoEmitReadyToShowOnLoad = value;
     },
+    setLoadFileBehavior: (behavior?: (window: MockBrowserWindow) => Promise<void>) => { loadFileBehavior = behavior; },
   };
 });
 
@@ -182,6 +188,9 @@ vi.mock("node:fs", async (importOriginal) => {
     writeFileSync: (path: string, content: string) => {
       fsState.files.set(path, content);
     },
+    rmSync: (path: string) => {
+      fsState.files.delete(path);
+    },
     renameSync: (oldPath: string, newPath: string) => {
       const content = fsState.files.get(oldPath);
       if (content === undefined) throw new Error(`ENOENT: ${oldPath}`);
@@ -205,6 +214,7 @@ describe("Electron main process", () => {
     mockState.ipcListeners.clear();
     mockState.nativeTheme.themeSource = "dark";
     mockState.setAutoEmitReadyToShowOnLoad(false);
+    mockState.setLoadFileBehavior();
     mockState.app.on.mockClear();
     mockState.app.whenReady.mockClear();
     mockState.app.whenReady.mockImplementation(async () => {});
@@ -383,8 +393,11 @@ describe("Electron main process", () => {
   });
 
   it("creates the hidden titlebar at the authored traffic-light position", async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value: "darwin" });
     const main = await loadAppModule();
     await new main.App().start();
+    Object.defineProperty(process, "platform", platform);
 
     const win = mockState.MockBrowserWindow.instances[0];
     expect({
@@ -394,6 +407,86 @@ describe("Electron main process", () => {
       titleBarStyle: "hidden",
       trafficLightPosition: { x: 15, y: 15 },
     });
+    expect(win.options.show).toBe(false);
+  });
+
+  it("provides a native Linux frame without Mac traffic-light coordinates", async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value: "linux" });
+    try {
+    const main = await loadAppModule();
+    await new main.App().start();
+    const win = mockState.MockBrowserWindow.instances[0];
+    expect(win.options.titleBarStyle).toBe("default");
+    expect(win.options.trafficLightPosition).toBeUndefined();
+    expect(win.options.show).toBe(true);
+    } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
+  it("makes the Linux release version available through the About menu", async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value: "linux" });
+    try {
+    const main = await loadAppModule();
+    await new main.App().start();
+    expect(mockState.app.setAboutPanelOptions).toHaveBeenCalledWith(expect.objectContaining({
+      applicationName: "Television", applicationVersion: "0.1.170", version: "",
+    }));
+    const template = mockState.Menu.buildFromTemplate.mock.calls[0][0] as Array<{
+      submenu?: Array<{ role?: string }>;
+    }>;
+    expect(template.flatMap(item => item.submenu ?? []).some(item => item.role === "about")).toBe(true);
+    } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
+  it("quits cleanly when the visible Linux window closes during its initial page load", async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value: "linux" });
+    try {
+      const before = mockState.app.quit.mock.calls.length;
+      mockState.setLoadFileBehavior(async window => {
+        window.emit("closed");
+        mockState.appHandlers.get("window-all-closed")?.();
+        throw new Error("ERR_ABORTED: window closed");
+      });
+      const main = await loadAppModule();
+      await expect(new main.App().start()).resolves.toBeUndefined();
+      expect(mockState.app.quit.mock.calls.length).toBe(before + 1);
+    } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
+  it("allows Disconnect to replace an initial load on the same window", async () => {
+    fsState.files.set("/tmp/television-test-userdata/connection.json", JSON.stringify({
+      serverURL: "http://localhost:32848", token: "saved-fixture-token",
+    }));
+    let rejectInitial!: (error: Error) => void;
+    let markInitialStarted!: () => void;
+    const initialStarted = new Promise<void>(resolve => { markInitialStarted = resolve; });
+    let loads = 0;
+    mockState.setLoadFileBehavior(async () => {
+      if (++loads !== 1) return;
+      await new Promise<void>((_resolve, reject) => {
+        rejectInitial = reject;
+        markInitialStarted();
+      });
+    });
+    const main = await loadAppModule();
+    const startup = new main.App().start();
+    const outcome = startup.then(() => undefined, error => error);
+    await initialStarted;
+    await mockState.ipcHandlers.get("television:disconnect")!({});
+    rejectInitial(new Error("ERR_ABORTED: navigation replaced"));
+    expect(await outcome).toBeUndefined();
+    expect(mockState.MockBrowserWindow.instances[0].webContents.stop).toHaveBeenCalledOnce();
+    expect(loads).toBe(2);
+    expect(fsState.files.has("/tmp/television-test-userdata/connection.json")).toBe(false);
+  });
+
+  it("still rejects a genuine failure of the current connect-screen load", async () => {
+    const error = new Error("connect.html missing");
+    mockState.setLoadFileBehavior(async () => { throw error; });
+    const main = await loadAppModule();
+    await expect(new main.App().start()).rejects.toBe(error);
   });
 
   it("sets the webview preload and explicitly disables webview contextIsolation", async () => {

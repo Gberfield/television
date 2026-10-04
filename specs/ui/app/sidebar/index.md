@@ -76,3 +76,7 @@ Under [the real-motion rule in the testing policy](../../../arch/testing-policy.
 
 Native window movement must be proven in the real Electron app against a running server. The proof must give the neighbouring tab strip enough tabs to overflow, scroll it rightwards, then drag the empty channel-sidebar titlebar and observe the `BrowserWindow` move. Movement with a fitting strip or with an overflowing strip still at its left edge does not satisfy this regression condition. Under [Tests are the validation mechanism](../../../arch/testing-policy.md#Tests are the validation mechanism), [foundation drag-region testing](../../../arch/ui/foundation.md#Testing) owns the shared selectors that define drag and no-drag regions. Proof that those selectors match does not replace the requirement stated here to prove native window movement. ^sb-titlebar-native-testing
 
+
+## Downstream Linux frame exception
+
+The [Linux native-frame policy](../../../product/linux-desktop.md) applies to this surface in downstream Linux builds. Its page content does not move the framed window; movement belongs to the native titlebar or compositor. The page-drag promises above remain the frameless Mac behavior. Linux coverage must observe no page-origin native move request and unchanged window bounds while retaining the surface's interactive controls. That coverage does not establish native titlebar or compositor movement, or Mac movement.

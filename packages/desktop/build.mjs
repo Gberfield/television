@@ -16,6 +16,7 @@ import { copyFileSync, cpSync, readFileSync, rmSync } from "node:fs";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { generateNoticesFromInventory } from "../../scripts/licenses/generate-notices.mjs";
+import { loadLicenseConfig } from "../../scripts/licenses/lib/config.mjs";
 import {
   mergeSurfaceInventories,
   resolveInventoryRoot,
@@ -24,8 +25,22 @@ import { inventoryFromEsbuildMetafile } from "../../scripts/licenses/lib/notices
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(packageDir, "../..");
-const distDir = path.join(packageDir, "dist");
-const inventoryRoot = resolveInventoryRoot({ root: repoRoot });
+const distDir = path.resolve(process.env.TV_DESKTOP_OUTPUT_DIR ?? path.join(packageDir, "dist"));
+const inventoryRoot = path.resolve(process.env.TV_DESKTOP_INVENTORY_DIR ?? resolveInventoryRoot({ root: repoRoot }));
+const linuxUpdateURL = process.env.TV_LINUX_UPDATE_URL ?? "";
+const linuxTarget = process.env.TV_DESKTOP_TARGET === "linux";
+const licenseConfig = loadLicenseConfig({ root: repoRoot });
+if (linuxTarget) {
+  // These reviewed notices apply only to the Linux bundle; Mac's inventory
+  // does not contain its update transport dependencies.
+  licenseConfig.notices.push(...JSON.parse(readFileSync(path.join(packageDir, "linux/notices.json"), "utf8")));
+}
+if (linuxUpdateURL) {
+  const url = new URL(linuxUpdateURL);
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("TV_LINUX_UPDATE_URL must be an HTTPS release-feed URL without credentials, query or fragment");
+  }
+}
 
 rmSync(distDir, { recursive: true, force: true });
 
@@ -39,6 +54,12 @@ const buildResults = await Promise.all([
     format: "cjs",
     outfile: path.join(distDir, "electron.cjs"),
     external: ["electron", "@todesktop/runtime"],
+    define: { __TV_LINUX_UPDATE_URL__: JSON.stringify(linuxUpdateURL) },
+    plugins: linuxTarget ? [{ name: "linux-update-runtime", setup(builder) {
+      builder.onResolve({ filter: /^\.\/update-runtime\.ts$/ }, () => ({
+        path: path.join(packageDir, "src", "update-runtime-linux.ts"),
+      }));
+    } }] : [],
     metafile: true,
   }),
   build({
@@ -105,6 +126,7 @@ const inventory = mergeSurfaceInventories("desktop", bundleInventories);
 generateNoticesFromInventory({
   surface: "desktop",
   inventory,
+  config: licenseConfig,
   root: repoRoot,
   inventoryRoot,
   outputPath: path.join(distDir, "THIRD-PARTY-NOTICES.txt"),

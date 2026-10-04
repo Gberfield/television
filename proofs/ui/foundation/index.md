@@ -34,3 +34,9 @@ Selection suppression and readable-region opt-in belong to the app surface and a
 The production scrolling-panel regression and the opened canonical panel/native-dialog matrix in the same browser file prove exterior pixels after real wheel scrolling with broad shadows disabled. Floating elements preserve authored light-DOM children and native host scrolling; native dialogs use the documented `.dialog-content` wrapper. The unwrapped native-dialog case retains native overflow and does not claim the complete edge treatment.
 
 Authored floating-panel layout and clipping are covered by the [popover proof](popover/index.md#^po-ac-authored-layout). The same browser file checks that a native dialog with either `height: 100px` or `max-height: 100px` constrains its `.dialog-content` scroll box, and samples an authored red border on opened production panels with both edge paints and broad shadows disabled.
+
+## Downstream Linux window chrome
+
+The Linux desktop marker reserves zero traffic-light space, while Mac reserves the existing 72px. ^linux-traffic-light-space
+
+The owning CSS is mirrored in the production foundation stylesheet. Desktop tests cover the native frame/platform branch; real-Electron packaged acceptance checks computed reservation. The preload supplies an inline fallback for current upstream server stylesheets.

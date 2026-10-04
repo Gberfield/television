@@ -1,0 +1,23 @@
+pkgname=television-linux-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Television desktop client for Linux (downstream Omarchy build)'
+arch=('x86_64')
+url='https://github.com/telepath-computer/television'
+license=('MIT')
+depends=('alsa-lib' 'at-spi2-core' 'bash' 'cairo' 'dbus' 'expat' 'glib2' 'gtk3' 'libcups' 'libdrm' 'libx11' 'libxcb' 'libxcomposite' 'libxdamage' 'libxext' 'libxfixes' 'libxkbcommon' 'libxrandr' 'mesa' 'nspr' 'nss' 'pango')
+options=('!strip')
+source=('@ARCHIVE@' 'computer.telepath.television.desktop')
+sha256sums=('@SHA256@' 'SKIP')
+package() {
+  install -d "$pkgdir/opt/television" "$pkgdir/usr/bin" "$pkgdir/usr/share/applications" "$pkgdir/usr/share/icons/hicolor/512x512/apps" "$pkgdir/usr/share/licenses/$pkgname"
+  cp -a "$srcdir/@DIRECTORY@/." "$pkgdir/opt/television/"
+  chmod -R a+rX "$pkgdir/opt/television"
+  chmod 4755 "$pkgdir/opt/television/chrome-sandbox"
+  # A wrapper, rather than a symlink, preserves the launcher's sibling path.
+  printf '#!/bin/sh\nexec /opt/television/television-launcher "$@"\n' > "$pkgdir/usr/bin/television"
+  chmod 755 "$pkgdir/usr/bin/television"
+  install -m644 "$srcdir/computer.telepath.television.desktop" "$pkgdir/usr/share/applications/"
+  install -m644 "$pkgdir/opt/television/television.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/computer.telepath.television.png"
+  install -m644 "$pkgdir/opt/television/LICENSE.television.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

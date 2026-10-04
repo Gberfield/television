@@ -44,6 +44,8 @@ test("a native press on a theme option over the draggable navbar selects it (^po
     await client.display.patch({ activeThemeName: "swiss" });
     launched = await launchDesktop({
       connectTo: { serverURL: server.serverURL, token: server.token },
+      // XTest addresses X11 windows, including XWayland on a Wayland host.
+      args: ["--ozone-platform=x11"],
     });
     const { app, page } = launched;
     await expectConnectedPage(page);

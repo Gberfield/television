@@ -3,6 +3,7 @@ import {
   isNewerVersion,
   isReleaseVersion,
   type DesktopUpgradeInstructions,
+  LINUX_UPGRADE_MARKDOWN,
 } from "@telepath-computer/television-shared";
 import { isElectronMode, resolveDesktopAppVersion } from "../config.ts";
 
@@ -84,6 +85,8 @@ export const GATE_FALLBACK_MARKDOWN =
   "\n" +
   "This version of the Television desktop app does not work with this server and needs to be updated. [Download the latest version for Mac](https://dl.todesktop.com/260923p52umxx/mac/dmg/arm64) and install it.";
 
+export const LINUX_GATE_FALLBACK_MARKDOWN = LINUX_UPGRADE_MARKDOWN;
+
 /**
  * Gate-screen message selection (^gate-instructions): the downloaded-update
  * message when the shell has reported a download, whatever the channel
@@ -94,8 +97,13 @@ export const GATE_FALLBACK_MARKDOWN =
 export function selectGateInstructions(
   desktop: DesktopUpgradeInstructions | null,
   downloadedUpdate = false,
+  desktopPlatform?: string,
 ): string {
   if (downloadedUpdate) return GATE_DOWNLOADED_UPDATE_MARKDOWN;
+  if (desktopPlatform === "linux" && (desktop === null ||
+    /https:\/\/dl\.todesktop\.com\/[^\s)]+\/mac\//.test(desktop.upgradeMarkdown))) {
+    return LINUX_GATE_FALLBACK_MARKDOWN;
+  }
   return desktop === null ? GATE_FALLBACK_MARKDOWN : desktop.upgradeMarkdown;
 }
 
