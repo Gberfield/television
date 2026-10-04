@@ -2,6 +2,8 @@
 
 This is a downstream Linux build of Television 1.4.23. It uses the same Electron app as the Mac version and bundles its runtime. Target: x86_64 Omarchy/Arch Linux with Hyprland/Wayland; X11 also works. The client connects to the Television server beside your agent, which may run on this machine or a remote one.
 
+The [downstream fork's Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable) provides the portable archive, AppImage and checksums. This is a fork release, not an official Telepath release. Physical host controls, perceived GPU behavior and fractional scaling remain pending acceptance.
+
 ## Open or install
 
 For the portable archive, extract the whole archive in your file manager. Open **Install Television.desktop** (allow execution/trust in your file manager when prompted), then open **Television** from the application launcher. You can also open **television-launcher** in the extracted folder directly. The graphical installer needs no administrator privileges and preserves saved Television connections. Some file managers require enabling executable files before double-clicking them.
@@ -21,6 +23,8 @@ Move the Linux window using its native titlebar or compositor bindings. Unlike t
 ## Updates
 
 A Linux build checks for AppImage updates only when its maintainer configures an HTTPS release feed. A configured URL alone does not establish that the feed is maintained or available. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
+
+The fork's published 1.4.23 AppImage is configured for its dedicated `linux-stable` HTTPS feed. Public downloads and checksums were verified. This bootstraps the feed; it is not a newer update for a 1.4.23 client. Automatic newer-version download and restart replacement still require acceptance when a later build is published.
 
 ## Build and package (for agents/maintainers)
 
