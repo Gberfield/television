@@ -2,7 +2,7 @@
 
 This is a downstream Linux build of Television 1.4.23. It uses the same Electron app as the Mac version and bundles its runtime. Target: x86_64 Omarchy/Arch Linux with Hyprland/Wayland; X11 also works. The client connects to the Television server beside your agent, which may run on this machine or a remote one.
 
-The [downstream fork's Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable) provides the portable archive, AppImage and checksums. This is a fork release, not an official Telepath release. Physical host controls, perceived GPU behavior and fractional scaling remain pending acceptance. Live external-page checks also reproduce a known readability issue in dark appearance: black text on transparent website backgrounds shows over the dark artifact card. Scrolling and navigation work, but those pages have not passed visual acceptance.
+The [downstream fork's Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable) provides the portable archive, AppImage and checksums. This is a fork release, not an official Telepath release. Physical host controls, perceived GPU behavior and fractional scaling remain pending acceptance. The published payloads reproduce a readability issue in dark appearance: black text on transparent website backgrounds shows over the dark artifact card. Current source disables Electron guest background transparency so each page receives its native light/dark canvas; [the canvas proof](../../../proofs/ui/app/artifact-frame/index.md#^af-ui-ac-document-canvas) covers default text, authored colors, native dark rendering, appearance changes and retained input. This source fix requires a new client build and has not been added to the published feed.
 
 ## Open or install
 

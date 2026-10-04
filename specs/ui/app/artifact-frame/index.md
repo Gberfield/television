@@ -19,6 +19,10 @@ Another surface may wear the frame's look around content of its own, as the [set
 
 The document is an `<iframe>` in the browser app — the desktop app renders it as a `<webview>`, with this template's iframe standing for either — so the artifact renders as its own document with its own styling. Nothing of Television's leaks into it or out of it, with one deliberate exception: the artifact bridge, Television's own script inside served documents, which observes, relays, and cancels two named native defaults without rewriting what the document shows ([arch/artifact-frame/artifact-bridge.md](../../../arch/artifact-frame/artifact-bridge.md)).
 
+## Desktop document canvas
+
+Desktop webviews render an opaque native browser canvas beneath the document’s own paint. Default black text with no authored background receives light backing and remains readable over a dark frame; a document declaring a dark color scheme receives its native dark canvas. Document-authored backgrounds and colors paint above that canvas. Television does not inject document styles or override the document’s color-scheme preference. Browser iframe rendering, loading and placeholder surfaces retain their own presentation. ^af-document-canvas
+
 ## Edge treatment
 
 The frame has a translucent white inner highlight over its document and titlebar, and a sharp black exterior rim above its broad shadow. Appearance selects the exterior density independently of document content or wallpaper. [Application tokens](../../foundation/tokens/app.css) and [artifact-frame.frame](./artifact-frame.frame) state the paint and geometry. The inner ring follows the frame radius and remains pointer-transparent. Circular CSS corners and broad shadows approximate window chrome; they do not reproduce native window rendering.
@@ -55,7 +59,7 @@ The loading and unreachable conditions are not error-page states: their presenta
 
 ## Testing
 
-A bounded browser raster regression covers the translucent frame edge and shared fractional sidebar seam at DPR1 and DPR2, including theme decoration overrides. This is an explicit exception to the general exclusion of styling assertions: fractional paint can disappear despite valid computed CSS. Other visual judgment remains part of design review.
+A bounded browser raster regression covers the translucent frame edge and shared fractional sidebar seam at DPR1 and DPR2, including theme decoration overrides. This is an explicit exception to the general exclusion of styling assertions: fractional paint can disappear despite valid computed CSS. A second bounded raster regression covers the real desktop webview canvas: default black text over a transparent document receives light backing in either application appearance, while authored backgrounds and a document-declared dark browser canvas retain their paint. This exception tests native composition across the document boundary; computed host CSS alone cannot prove it. Other visual judgment remains part of design review.
 
 Under [What a UI surface's suite is responsible for](../../../arch/testing-policy.md#What a UI surface's suite is responsible for), this surface's suite must prove the frame with no navigation history and with history behind or ahead. It must prove the frame while the page is in ordinary mode and while it is in full-screen mode. The suite must also prove that the production delete confirmation names the artifact. Independently, it must prove that the authoritative reference frame renders its complete confirmation copy through Frameset with its default artifact title and with supplied artifact titles, including HTML-sensitive characters rendered as text. It must prove that the artifact name in the title bar matches the document's accessible name.
 
