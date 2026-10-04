@@ -118,7 +118,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
   - **app/**
     - `index.md` (117 lines) — *UI spec: the app shell — its two interface regions and the noninteractive visual layers that installed themes can place around them.*
     - **artifact-frame/**
-      - `index.md` (66 lines) — *UI spec: the artifact frame — the surface that holds one artifact's document.*
+      - `index.md` (70 lines) — *UI spec: the artifact frame — the surface that holds one artifact's document.*
     - **copy-button/**
       - `index.md` (45 lines) — *UI spec: the copy button — a control that copies a value and briefly confirms, without resizing.*
     - **desktop-upgrade-gate/**
