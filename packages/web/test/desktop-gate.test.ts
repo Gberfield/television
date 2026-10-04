@@ -46,6 +46,14 @@ import { installNativeDialogMock } from "./helpers/dialog.ts";
 //     shows both.
 
 describe("Electron context and shell-version parsing (^t-electron-detection)", () => {
+  it("gives Linux installation instructions even when the server advertises a Mac download", () => {
+    const message = selectGateInstructions({ upgradeMarkdown: GATE_FALLBACK_MARKDOWN }, false, "linux");
+    expect(message).toContain("Linux");
+    expect(message).not.toContain("Mac");
+    expect(selectGateInstructions(null, true, "linux")).toBe(GATE_DOWNLOADED_UPDATE_MARKDOWN);
+    expect(selectGateInstructions({ upgradeMarkdown: "Linux channel release instructions." }, false, "linux"))
+      .toBe("Linux channel release instructions.");
+  });
   it("detects Electron context from ?mode=electron, shell version from ?desktopAppVersion=", () => {
     expect(detectElectronContext({ search: "?mode=electron&desktopAppVersion=1.2.3" })).toEqual({
       electron: true,

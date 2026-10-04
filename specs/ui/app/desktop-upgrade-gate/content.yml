@@ -19,3 +19,9 @@ fallback_instructions: |-
 # The restart button's label, and its label once pressed.
 restart_to_update: Restart to update
 restarting: Restarting…
+
+# The downstream Linux app uses these instructions even with a Mac-only channel.
+linux_fallback_instructions: |-
+  # Desktop app update required
+
+  This version of Television needs a newer Linux desktop build to connect to this server. Update Television with your Linux package manager, or replace your AppImage or portable installation with a newer Linux build. Your saved server connection is kept.

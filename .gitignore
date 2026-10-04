@@ -67,3 +67,4 @@ scratch/
 # agent scratch/work docs
 tmp/
 /plans
+packages/desktop/release/

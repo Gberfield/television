@@ -19,12 +19,18 @@ export interface ConnectTestServer {
 }
 
 /** Real Television server serving the built application, with retained storage across restart. */
-export async function startConnectTestServer(options: { auth?: boolean } = {}): Promise<ConnectTestServer> {
+export async function startConnectTestServer(options: { auth?: boolean; bundledViews?: boolean } = {}): Promise<ConnectTestServer> {
   const storagePath = mkdtempSync(path.join(os.tmpdir(), "television-connect-e2e-server-"));
   const staticDir = mkdtempSync(path.join(os.tmpdir(), "television-connect-e2e-static-"));
   cpSync(WEB_DIST, staticDir, { recursive: true });
 
-  const create = () => new Server({ store: createServingStore(storagePath), host: "127.0.0.1", port: 0, auth: options.auth ?? true, staticDir });
+  const create = () => new Server({
+    store: createServingStore(storagePath, options.bundledViews ? {
+      bundledViewsPath: path.resolve(HERE, "../../../cli/dist/views"),
+    } : {}),
+    host: "127.0.0.1", port: 0, auth: options.auth ?? true, staticDir,
+    canonicalDir: options.bundledViews ? path.resolve(HERE, "../../../canonical/dist/canonical") : undefined,
+  });
   let server = create();
   let stopped = false;
   await server.start();

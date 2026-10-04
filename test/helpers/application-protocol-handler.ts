@@ -36,7 +36,7 @@ export function createApplicationProtocolHandler(
   mkdirSync(configHome, { recursive: true });
   mkdirSync(binDir, { recursive: true });
   writeFileSync(handlerPath, `#!/bin/sh\nprintf '%s\\n' "$1" >> ${JSON.stringify(markerPath)}\n`);
-  writeFileSync(xdgOpenPath, "#!/bin/sh\nexec /usr/bin/gio open \"$@\"\n");
+  writeFileSync(xdgOpenPath, "#!/bin/sh\nexec gio open \"$@\"\n");
   chmodSync(handlerPath, 0o755);
   chmodSync(xdgOpenPath, 0o755);
   writeFileSync(path.join(applicationsDir, desktopName), `[Desktop Entry]

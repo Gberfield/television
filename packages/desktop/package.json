@@ -13,11 +13,13 @@
   },
   "scripts": {
     "build": "node build.mjs",
+    "package:linux": "node scripts/linux-build.mjs",
     "todesktop-build": "node build.mjs && node scripts/todesktop-build.mjs",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@todesktop/runtime": "2.1.4"
+    "@todesktop/runtime": "2.1.4",
+    "electron-updater": "6.8.9"
   },
   "devDependencies": {
     "@telepath-computer/television-artifact": "*",
@@ -25,6 +27,7 @@
     "@telepath-computer/utils": "*",
     "@todesktop/cli": "1.28.2",
     "electron": "43.7.6",
+    "electron-builder": "26.16.1",
     "lit-html": "3.3.2"
   }
 }

@@ -56,6 +56,7 @@ const GATE_CONTENT = parse(
 ) as {
   downloaded_update_instructions: string;
   fallback_instructions: string;
+  linux_fallback_instructions: string;
   restart_to_update: string;
   restarting: string;
 };
@@ -276,6 +277,12 @@ async function expectAuthoredMessage(page: Page, markdown: string): Promise<void
 // The built-in fallback, with its link and no restart button
 // (specs/ui/app/desktop-upgrade-gate/content.yml#fallback_instructions).
 async function expectFallbackInstructions(page: Page): Promise<void> {
+  if (process.platform === "linux") {
+    await expectAuthoredMessage(page, GATE_CONTENT.linux_fallback_instructions);
+    await expect(gate(page).locator('a[href*="dl.todesktop.com"]')).toHaveCount(0);
+    await expect(gate(page).locator(".upgrade-gate-restart")).toHaveCount(0);
+    return;
+  }
   await expectAuthoredMessage(page, GATE_CONTENT.fallback_instructions);
   const [, text, href] = /\[([^\]]+)\]\(([^)]+)\)/.exec(GATE_CONTENT.fallback_instructions)!;
   await expect(gate(page).locator(`a[href="${href}"]`)).toHaveText(text!);

@@ -81,6 +81,7 @@ export {
   type UserMessage,
 } from "./acp-types.ts";
 export { TelevisionClient } from "./client.ts";
+export { LINUX_UPGRADE_HEADING, LINUX_UPGRADE_MESSAGE, LINUX_UPGRADE_MARKDOWN } from "./linux-desktop.ts";
 export { buildConnectURL, parseConnectURL } from "./connect-url.ts";
 export {
   DEV_VERSION,
