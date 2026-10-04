@@ -79,6 +79,12 @@ interface StageFixture {
   report(): StageReport;
 }
 
+interface ResizeCrossingObservation {
+  interruptedBeforeFinish: boolean;
+  samples: Array<{ centerOffset: number; runningCrossings: number }>;
+  finish(): void;
+}
+
 async function waitForStage(page: Page, allowCSSMotion = false): Promise<void> {
   await page.waitForFunction(
     (artifactIDs) => {
@@ -426,6 +432,95 @@ test.describe("stage channel redraw (^st-ac-channel-redraw)", () => {
 });
 
 test.describe("stage page sizing", () => {
+  for (const [initialWidth, resizedWidth] of [[1_201, 761], [761, 1_201]] as const) {
+    test(`centres a selected page when window tracking interrupts its crossing (${initialWidth} to ${resizedWidth})`, async ({ page }) => {
+      await page.setViewportSize({ width: initialWidth, height: 821 });
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await page.goto(FIXTURE);
+      await waitForStage(page, true);
+      await settleStage(page);
+      await capture(page);
+
+      await page.locator('.tab[data-artifact-id="artifact-c"]').click();
+      await page.waitForFunction(() =>
+        document.querySelector(".filmstrip")?.getAnimations().some((animation) =>
+          animation.playState === "running"
+        )
+      );
+      await page.evaluate(() => {
+        const filmstrip = document.querySelector<HTMLElement>(".filmstrip")!;
+        const crossing = filmstrip.getAnimations().find((animation) =>
+          animation.playState === "running"
+        )!;
+        const initialWidth = filmstrip.clientWidth;
+        let frame = 0;
+        let sampling = false;
+        const observation: ResizeCrossingObservation = {
+          interruptedBeforeFinish: false,
+          samples: [],
+          finish() {
+            observer.disconnect();
+            cancelAnimationFrame(frame);
+          },
+        };
+        window.addEventListener("resize", () => {
+          observation.interruptedBeforeFinish = crossing.playState !== "finished";
+        }, { once: true });
+        const sample = () => {
+          const selected = document.querySelector(".page[selected]")!.getBoundingClientRect();
+          const strip = filmstrip.getBoundingClientRect();
+          observation.samples.push({
+            centerOffset: selected.left + selected.width / 2 - (strip.left + strip.width / 2),
+            runningCrossings: filmstrip.getAnimations().filter((animation) =>
+              animation.playState === "running"
+            ).length,
+          });
+          frame = requestAnimationFrame(sample);
+        };
+        const observer = new ResizeObserver(() => {
+          if (filmstrip.clientWidth === initialWidth || sampling) return;
+          sampling = true;
+          // Sample rendered frames after resize delivery, rather than transient
+          // layout inside another observer's pre-paint callback.
+          frame = requestAnimationFrame(sample);
+        });
+        observer.observe(filmstrip);
+        (window as unknown as { __resizeCrossing: ResizeCrossingObservation })
+          .__resizeCrossing = observation;
+      });
+      await page.setViewportSize({ width: resizedWidth, height: 733 });
+      await page.evaluate(async () => {
+        const stage = document.querySelector(".stage")!;
+        await Promise.all(stage.getAnimations({ subtree: true }).map((animation) =>
+          animation.finished.catch(() => {})
+        ));
+      });
+      await settleStage(page);
+
+      const tracking = await page.evaluate(() => {
+        const observation = (window as unknown as {
+          __resizeCrossing: ResizeCrossingObservation;
+        }).__resizeCrossing;
+        observation.finish();
+        return {
+          interruptedBeforeFinish: observation.interruptedBeforeFinish,
+          samples: observation.samples,
+        };
+      });
+      expect(tracking.interruptedBeforeFinish).toBe(true);
+      expect(tracking.samples.length).toBeGreaterThan(1);
+      for (const sample of tracking.samples) {
+        expect(Math.abs(sample.centerOffset)).toBeLessThan(1);
+        expect(sample.runningCrossings).toBe(0);
+      }
+
+      const resized = await report(page);
+      expect(resized.selectedArtifactID).toBe("artifact-c");
+      expect(Math.abs(resized.selectedCenterOffset ?? Infinity)).toBeLessThan(1);
+      expectRetainedDocuments(resized);
+    });
+  }
+
   test("renders fractional stored sizes through the shared factor without animating window tracking", async ({ page }) => {
     await page.setViewportSize({ width: 1_201, height: 821 });
     await page.emulateMedia({ reducedMotion: "no-preference" });
