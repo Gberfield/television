@@ -328,7 +328,7 @@ describe("test runner guardrails", () => {
     // silently skip the heavy tier when attest-check CRASHES — never-skip-
     // on-doubt applies to the job graph too), no-op explicitly, and guard
     // every real step.
-    for (const [heavy, realSteps] of [[job("test", "build"), 14], [job("build", "e2e"), 10], [job("e2e", "e2e-required"), 22]] as const) {
+    for (const [heavy, realSteps] of [[job("test", "build"), 15], [job("build", "e2e"), 10], [job("e2e", "e2e-required"), 22]] as const) {
       expect(heavy).toContain("attest-check");
       const jobIf = heavy.match(/^    if: (.*)$/m);
       expect(jobIf).not.toBeNull();

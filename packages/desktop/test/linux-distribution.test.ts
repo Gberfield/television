@@ -49,7 +49,9 @@ describe.skipIf(process.platform !== "linux")("Linux distribution scripts", () =
     expect(existsSync(path.join(prefix, "television"))).toBe(true);
     expect(readFileSync(entry, "utf8")).toContain(`Exec=bash "${prefix}/television-launcher"`);
     expect(readFileSync(entry, "utf8")).not.toContain("--no-sandbox");
-    expect(spawnSync("desktop-file-validate", [entry], { encoding: "utf8" }).status).toBe(0);
+    const validation = spawnSync("desktop-file-validate", [entry], { encoding: "utf8" });
+    expect(validation.error, "desktop-file-validate must be installed on the Linux test host").toBeUndefined();
+    expect(validation.status, validation.stderr).toBe(0);
   });
   it("refuses to overwrite an unrelated nonempty installation folder", () => {
     const { app, root, env } = fixture();

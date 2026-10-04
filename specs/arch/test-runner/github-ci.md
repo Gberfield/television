@@ -106,6 +106,8 @@ The shard worker's owner-lifecycle supervisor and leak detector (contracts owned
 - The current required set: `ss` (iproute2) and a readable `/proc` (procfs) for socket-to-process attribution. The owning spec for the leak detector defines what it does with them; this spec guarantees the environment provides them.
 - Changes to the required tool set land here and in the workflow's assert/install step in the same change.
 
+The Linux unit job also requires `desktop-file-validate` from `desktop-file-utils` for the downstream installer's real desktop-entry validation. CI asserts it is present or installs that package before running the unit suite, including on dependency-cache hits. A missing validator fails the setup or test; it does not skip desktop-entry validation. This host-tool setup does not change dependency-cache identity, browser preparation, artifact transfer or failure propagation.
+
 ## CI worker counts
 
 **GitHub e2e matrix:** **16 shards** is the measured cost/latency knee. Run `29561697838` completed the build-through-join critical path in 3m31s at 29.42 e2e runner-minutes. The 24-way run `29565323284` saved only 17 seconds while consuming 37.10 runner-minutes (26% more), so regular CI does not buy that last increment. The job name denominator, matrix indices, planner total, worker total, and agreement-join expectation change together.
