@@ -45,7 +45,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `distribution.md` (34 lines) — *How the ToDesktop build's promises are proven: repository checks of the desktop workspace, its ToDesktop configuration, a generated upload directory, the build script's exit status and the real ToDesktop CLI's dry run, and the product's real-host checks for everything ToDesktop does.*
     - `e2e-harness.md` (21 lines) — *How the promises in Electron e2e harness are proven.*
     - `index.md` (28 lines) — *How the desktop architecture root's promises are proven: main-process identity contracts and a real-Electron data-location seam, composed with the module proofs and the product's real-host checks.*
-    - `linux-distribution.md` (71 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
+    - `linux-distribution.md` (73 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
     - `runtime.md` (21 lines) — *How the Electron runtime's promises are proven: exact-version declarations, runtime validity over authored package and runtime trees, and a real cold installation on a Node release known to truncate one.*
     - `updates.md` (28 lines) — *How desktop updates are proven: main-process and preload contracts with Electron and the update runtime replaced by recording mocks, the real Electron app with the runtime in its simulation mode, and the desktop product's update check, which presses the restart in a candidate build on a real Mac.*
   - **layout/**
