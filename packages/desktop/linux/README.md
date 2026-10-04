@@ -20,7 +20,7 @@ Move the Linux window using its native titlebar or compositor bindings. Unlike t
 
 ## Updates
 
-This build has no maintained Linux release feed configured. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
+A Linux build checks for AppImage updates only when its maintainer configures an HTTPS release feed. A configured URL alone does not establish that the feed is maintained or available. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
 
 ## Build and package (for agents/maintainers)
 
