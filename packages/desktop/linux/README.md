@@ -18,6 +18,8 @@ Use **File → Disconnect from Server** or **Ctrl+,** to change servers. The app
 
 The launcher chooses native Wayland whenever `WAYLAND_DISPLAY` is present. Hyprland receives app identity `computer.telepath.television`. The desktop entry works with Omarchy's application launcher and ordinary Hyprland window bindings. An agent can set `TV_OZONE_PLATFORM=x11` for XWayland troubleshooting or pass `--ozone-platform=x11`; the launcher preserves explicit flags. No theme files, Hyprland bindings, system services or existing applications are changed by installation.
 
+The Linux **Window** menu provides **Minimize**, **Maximize / Restore** and **Close**. Maximize / Restore toggles the focused native window and keeps its server connection.
+
 Move the Linux window using its native titlebar or compositor bindings. Unlike the frameless Mac window, page content such as the sidebar/top-bar and modal strips does not drag the framed Linux window. Physical titlebar dragging and keyboard input need host acceptance independently of programmatic window operations.
 
 ## Updates
@@ -33,5 +35,7 @@ The feed now serves 1.4.25 from merged `caa6830da75e8e1c751613ddbece2226835c2ce2
 After publication on October 4, the provided portable installer upgraded the normal user installation from 1.4.23 to the exact publicly verified 1.4.25 payload. Two launches using the actual existing Television profile reconnected to the unchanged persistent server without link entry; the saved connection remained byte-identical. The main renderer and five artifact guests had seccomp 2 and no-new-privileges 1 without sandbox-disabling flags. The desktop entry and installed icon matched the release. This acceptance used an independent private Wayland/Pixman compositor; the client was closed afterward, desktop control remained stopped and the active workspace was unchanged. It supplements installation and saved-connection coverage, without accepting physical controls, launcher interaction, hardware GPU behavior or fractional scaling. The [distribution proof](../../../proofs/arch/desktop/linux-distribution.md#^linux-install-paths) records the scope.
 
 Use Node 24 and npm >=11.5 <12. From the source root run `npm ci`, install Electron's exact runtime with `node node_modules/electron/install.js`, then `npm run package:linux`. `TV_LINUX_OUTPUT_DIR` selects the output folder. The build produces AppImage, portable tar.gz, hashes and an `arch/` folder. On Arch, an agent can run `makepkg -si` inside `arch/`; no AUR publication is claimed.
+
+`TV_LINUX_REQUIRE_WINDOW_MANAGER=1` adds real menu maximize/restore checks to packaged acceptance when the private test display has a window manager. The harness activates the installed menu callback and checks native state, restored bounds and saved connection; it does not accept physical menu input or compositor shortcuts.
 
 Strict packaged host tests use `TV_LINUX_REQUIRE_SANDBOX=1` so the generic cloud test fallback cannot disable the sandbox. The acceptance record distinguishes native Wayland/X11, enabled-sandbox and AppImage launch checks from physical-input, GPU/fractional-scale and production-update checks. A browser walkthrough cannot execute the Linux binary. MIT license and Electron/Chromium notices are included.

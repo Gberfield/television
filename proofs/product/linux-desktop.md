@@ -20,6 +20,8 @@ The existing Mac/shared application suites retain coverage of channels, editing 
 
 `ELECTRON_DISABLE_SANDBOX=1` supplies a cloud-only launch override; production launchers retain Chromium's sandbox defaults.
 
+`TV_LINUX_REQUIRE_WINDOW_MANAGER=1` requests native menu maximize/restore acceptance on a test display with a real window manager; production does not read it.
+
 `TV_LINUX_REQUIRE_SANDBOX=1` requires the packaged child to ignore that generic harness override and launch with the production sandbox. The test asserts no disabling switch, sandboxed renderer preferences, Linux seccomp filtering and no-new-privileges. It does not change production behavior or establish physical input acceptance.
 
 Wayland acceptance uses the distribution launcher's real session-based backend selection before Playwright's early `app.whenReady()`; production invokes that same launcher.
@@ -31,6 +33,14 @@ The established `--test-fixture` hook bypasses connection for the gate seam; a s
 The Linux frame supplies native controls, and About exposes the release ([owning promise](../../specs/product/linux-desktop.md#downstream-linux-desktop-application)). ^linux-native-window
 
 Evidence: `main.test.ts`, “provides a native Linux frame without Mac traffic-light coordinates” and “makes the Linux release version available through the About menu”. These contract tests replace Electron at the process boundary; they forfeit actual compositor behavior. `e2e/linux-packaged.test.ts` launches the real packaged executable and records visible and maximizable state, Ozone backend and identity. Physical window management on Hyprland is pending separately. Electron 43.7.6 ignores CSS drag regions when its owner has a native frame. `window-drag-regions.test.ts` checks no native move request and stationary bounds from Linux page drags while keeping controls and overflow usable; the owning UI proofs describe those seams. This neither verifies physical native-titlebar movement nor proves the frameless Mac path.
+
+The Linux Window menu supplies Minimize, Maximize / Restore and Close, toggles the focused window in both directions and safely ignores activation without a focused window ([owning promise](../../specs/product/linux-desktop.md#^linux-window-menu)). ^linux-window-menu-contract
+
+Shape: contract. Evidence: `main.test.ts` checks the Linux menu roles, both state transitions against the window supplied by Electron (distinct from the primary application window), and activation without a focused window. macOS and Windows retain Electron’s standard Window menu. The declared Electron process-boundary mock observes native method calls only; it forfeits actual window-manager transitions and connection continuity to the following acceptance assertion.
+
+The connected packaged window maximizes and restores its previous normal size through the Linux menu without losing its saved connection ([owning promise](../../specs/product/linux-desktop.md#^linux-window-menu)). ^linux-window-menu-acceptance
+
+Shape: acceptance. Evidence: with `TV_LINUX_REQUIRE_WINDOW_MANAGER=1`, the packaged spine activates the real installed menu callback on the connected packaged window, waits for actual maximized/restored state and restored normal bounds, checks the connected shell and byte-identical saved connection after each transition, and records before/maximized/restored screenshots. This selector requires a real window manager on the test display; without it, the spine does not claim maximize/restore acceptance. Menu callback activation is harness-driven and forfeits physical menu selection, titlebar controls and compositor shortcuts. A private headless compositor result does not accept the physical Omarchy session or hardware/scaling behavior.
 
 The Linux package rejects bad auth, connects, renders HTML/Markdown/URL artifacts, sends native appearance changes and reconnects with its saved profile ([owning promise](../../specs/product/linux-desktop.md#downstream-linux-desktop-application)). ^linux-packaged-spine
 

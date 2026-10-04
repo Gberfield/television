@@ -416,7 +416,23 @@ export class App {
       },
       { role: "editMenu" },
       { role: "viewMenu" },
-      { role: "windowMenu" },
+      process.platform === "linux"
+        ? {
+            label: "Window",
+            submenu: [
+              { role: "minimize" },
+              {
+                label: "Maximize / Restore",
+                click: (_item, window) => {
+                  if (!window) return;
+                  if (window.isMaximized()) window.unmaximize();
+                  else window.maximize();
+                },
+              },
+              { role: "close" },
+            ],
+          }
+        : { role: "windowMenu" },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
   }

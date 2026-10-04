@@ -12,6 +12,7 @@ import { DESKTOP_UPDATE_DOWNLOADED_CHANNEL, RESTART_TO_INSTALL_UPDATE_CHANNEL } 
 const packageDir = process.env.TV_LINUX_PACKAGE_DIR;
 const packageLauncher = process.env.TV_LINUX_PACKAGE_LAUNCHER ?? "television-launcher";
 const evidenceDir = process.env.TV_LINUX_EVIDENCE_DIR;
+const requireWindowManager = process.env.TV_LINUX_REQUIRE_WINDOW_MANAGER === "1";
 const requireSandbox = process.env.TV_LINUX_REQUIRE_SANDBOX === "1";
 test.skip(process.platform !== "linux" || !packageDir, "Requires the actual built Linux package");
 
@@ -96,6 +97,39 @@ test("packaged Linux client authenticates, renders artifacts, applies native app
       await page.evaluate(mode => (globalThis as typeof globalThis & { __televisionNativeBridge: { setAppearanceMode(mode: string): void } }).__televisionNativeBridge.setAppearanceMode(mode), mode);
       await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe(mode);
     }
+    let windowMenuAcceptance: { normal: Electron.Rectangle; maximized: Electron.Rectangle; restored: Electron.Rectangle } | undefined;
+    if (requireWindowManager) {
+      const savedConnection = readFileSync(path.join(profile, "connection.json"));
+      const windowState = () => app.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        return { maximized: window.isMaximized(), bounds: window.getBounds() };
+      });
+      // Activates the installed real Menu callback; physical menu selection is
+      // forfeited to host evidence (proofs/product/linux-desktop.md).
+      const activateToggle = () => app.evaluate(({ BrowserWindow, Menu }) => {
+        const menu = Menu.getApplicationMenu()?.items.find(item => item.label === "Window")?.submenu;
+        const item = menu?.items.find(item => item.label === "Maximize / Restore");
+        if (!item) throw new Error("Missing Linux Maximize / Restore menu item");
+        item.click(undefined, BrowserWindow.getAllWindows()[0], undefined);
+      });
+      await client.display.focus({ artifactID: overview.artifact.id });
+      await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Actual packaged Electron client")]));
+      const normal = await windowState();
+      expect(normal.maximized).toBe(false);
+      if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `linux-${backend}-menu-before.png`) });
+      await activateToggle();
+      await expect.poll(windowState).toMatchObject({ maximized: true });
+      const maximized = await windowState();
+      await expect(page.locator("#app[data-app-state='connected']")).toBeVisible();
+      expect(readFileSync(path.join(profile, "connection.json"))).toEqual(savedConnection);
+      if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `linux-${backend}-menu-maximized.png`) });
+      await activateToggle();
+      await expect.poll(windowState).toEqual(normal);
+      await expect(page.locator("#app[data-app-state='connected']")).toBeVisible();
+      expect(readFileSync(path.join(profile, "connection.json"))).toEqual(savedConnection);
+      if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `linux-${backend}-menu-restored.png`) });
+      windowMenuAcceptance = { normal: normal.bounds, maximized: maximized.bounds, restored: (await windowState()).bounds };
+    }
     expect(JSON.parse(readFileSync(path.join(profile, "connection.json"), "utf8"))).toEqual({ serverURL: server.serverURL, token: server.token });
     await app.close();
     app = await launch(); page = await app.firstWindow();
@@ -120,7 +154,7 @@ test("packaged Linux client authenticates, renders artifacts, applies native app
         htmlArtifact: true, markdownArtifact: true, independentURLWebview: true, nativeAppearanceIPC: true,
         savedConnectionRelaunch: true, nativeDisconnectMenu: true, disconnectAcceleratorRegistered: true, syntheticContent: true,
         sandboxEnabledHostAcceptance: requireSandbox && !native.sandboxDisabled && native.rendererSandbox === true,
-        rendererSandboxStatus,
+        rendererSandboxStatus, windowMenuAcceptance,
       }, null, 2) + "\n");
     }
   } finally {

@@ -423,6 +423,46 @@ describe("Electron main process", () => {
     } finally { Object.defineProperty(process, "platform", platform); }
   });
 
+  it.each([false, true, undefined])("Linux Window menu toggles the focused native window (maximized=%s)", async maximized => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value: "linux" });
+    try {
+      const main = await loadAppModule();
+      await new main.App().start();
+      // Declared process-boundary mock: method calls, not compositor behavior
+      // (proofs/product/linux-desktop.md#^linux-window-menu-contract).
+      const focusedWindow = maximized === undefined ? undefined : {
+        isMaximized: vi.fn(() => maximized), maximize: vi.fn(), unmaximize: vi.fn(),
+      };
+      const template = mockState.Menu.buildFromTemplate.mock.calls[0][0] as Array<{
+        label?: string;
+        submenu?: Array<{ role?: string; label?: string; click?: (item: unknown, window: typeof focusedWindow) => void }>;
+      }>;
+      const submenu = template.find(item => item.label === "Window")?.submenu;
+      expect(submenu?.map(item => item.role ?? item.label)).toEqual(["minimize", "Maximize / Restore", "close"]);
+      const toggle = submenu?.find(item => item.label === "Maximize / Restore")?.click;
+      expect(toggle).toBeTypeOf("function");
+      expect(() => toggle!(undefined, focusedWindow)).not.toThrow();
+      if (focusedWindow) {
+        expect(focusedWindow.isMaximized).toHaveBeenCalledOnce();
+        expect(focusedWindow.maximize).toHaveBeenCalledTimes(maximized ? 0 : 1);
+        expect(focusedWindow.unmaximize).toHaveBeenCalledTimes(maximized ? 1 : 0);
+      }
+    } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
+  it.each(["darwin", "win32"])("retains the standard Window menu on %s", async value => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { ...platform, value });
+    try {
+      const main = await loadAppModule();
+      await new main.App().start();
+      const template = mockState.Menu.buildFromTemplate.mock.calls[0][0] as Array<{ role?: string; label?: string }>;
+      expect(template.filter(item => item.role === "windowMenu")).toHaveLength(1);
+      expect(template.some(item => item.label === "Window")).toBe(false);
+    } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
   it("makes the Linux release version available through the About menu", async () => {
     const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
     Object.defineProperty(process, "platform", { ...platform, value: "linux" });
