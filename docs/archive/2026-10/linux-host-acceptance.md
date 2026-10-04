@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #2.** This ledger records the Linux build and acceptance investigation, with eight physical/native cases still deferred rather than accepted. It preserves the combined run identities, fixture declarations and host observations unavailable from the source diff alone. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Omarchy host acceptance
 
 Baseline reconstruction: upstream e81bfc74732d6c84af3d254d1ba2625838cbd1fb plus the authorized source patch; local commit 07fe2fb has tree 64d7d79be190ae26fa869774ff9d69d8ffc3bf56. The initial source tree was compared with the authorized patch before host revisions.

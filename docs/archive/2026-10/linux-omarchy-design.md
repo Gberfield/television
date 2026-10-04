@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #2.** This proposal shaped the downstream Linux platform and distribution specs; its implementation is complete with physical host acceptance still deferred. It preserves the coherent design rationale connecting the native frame, packaging and update ownership choices. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Television for Linux design
 
 User request: a full parity Linux desktop app matching Television for Mac and working on Omarchy. This is a downstream adaptation of MIT-licensed commit `e81bfc74732d6c84af3d254d1ba2625838cbd1fb`, release 1.4.23; it does not claim upstream Linux support or authority to publish upstream releases.

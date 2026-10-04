@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #2.** This implementation plan guided the Linux port, with the user subsequently authorizing review preparation while eight host checks remain deferred. It preserves the coherent sequence and boundary-level review focus that the final diff cannot reconstruct. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Television Linux implementation plan
 
 > For agentic workers: use superpowers:executing-plans for inline execution. The user has authorized running setup and delivery without additional approval gates.
