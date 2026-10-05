@@ -8,6 +8,8 @@ The same Electron app supplies setup, authenticated connection and recovery, sav
 
 On Linux, the Window menu offers Minimize, Maximize / Restore and Close. Maximize / Restore toggles the focused native window between maximized and its previous normal size, while keeping its server connection. With no focused window, the action does nothing. ^linux-window-menu
 
+On Hyprland, the Window menu offers **Hide** instead of Minimize. Hide removes the window from view while retaining its server connection and current content. Opening Television again with the same application profile brings back that existing window. Other Linux desktops retain native Minimize. ^linux-hyprland-hide
+
 Linux window movement belongs to the native titlebar/compositor. Its framed Electron window ignores in-page CSS drag regions, so the sidebar, top-bar, setup and modal strips do not move the Linux window. This is an explicit platform exception to the frameless Mac drag interaction. Native compositor movement must be checked on a real window-manager/Omarchy session; the Xvfb page-drag driver does not establish that acceptance.
 
 Users receive a bundled portable archive or AppImage without a Node/npm runtime requirement. A graphical installer installs the portable client into the user's applications and an Arch PKGBUILD supports distribution-managed installation. The packaged launcher selects Wayland when the session exposes it, X11 otherwise, and preserves explicit platform flags and all arguments. It never disables Chromium's sandbox or acceleration by default.

@@ -140,8 +140,17 @@ export class App {
   private retryDelay = INITIAL_RETRY_MS;
   private pendingNavigation: { attempt: number; connection: Connection; version: string } | null = null;
   private localPage = false;
+  private hiddenByMenu = false;
+  private readonly isHyprland = process.platform === "linux"
+    && (process.env.XDG_CURRENT_DESKTOP ?? "").split(":")
+      .some(desktop => desktop.trim().toLowerCase() === "hyprland");
 
   async start(): Promise<void> {
+    if (this.isHyprland) {
+      // Electron scopes the lock to this application's user-data profile.
+      if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+      app.on("second-instance", () => this.revealWindow());
+    }
     await app.whenReady();
     if (process.platform === "darwin") {
       app.setAboutPanelOptions({
@@ -175,12 +184,24 @@ export class App {
       if (process.platform !== "darwin") app.quit();
     });
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
+      if (this.isHyprland && this.window) this.revealWindow();
+      else if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
     });
     await this.createWindow();
   }
 
+  private revealWindow(): void {
+    const window = this.window;
+    // A launch during readiness is fulfilled by the visible initial window.
+    if (!window || window.isDestroyed()) return;
+    this.hiddenByMenu = false;
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+  }
+
   private async createWindow(): Promise<void> {
+    this.hiddenByMenu = false;
     this.window = new BrowserWindow({
       title: "Television",
       icon: path.join(__dirname, "..", "assets", "icon.png"),
@@ -213,7 +234,9 @@ export class App {
       if (validatedURL.startsWith("file:") || this.localPage) return;
       void this.loadConnectScreen();
     });
-    this.window.once("ready-to-show", () => this.window?.show());
+    this.window.once("ready-to-show", () => {
+      if (!this.hiddenByMenu) this.window?.show();
+    });
     this.window.on("closed", () => {
       this.cancelConnectionWork();
       this.window = null;
@@ -420,7 +443,16 @@ export class App {
         ? {
             label: "Window",
             submenu: [
-              { role: "minimize" },
+              this.isHyprland
+                ? {
+                    label: "Hide",
+                    click: (_item, window) => {
+                      if (!window) return;
+                      if (window === this.window) this.hiddenByMenu = true;
+                      window.hide();
+                    },
+                  }
+                : { role: "minimize" },
               {
                 label: "Maximize / Restore",
                 click: (_item, window) => {

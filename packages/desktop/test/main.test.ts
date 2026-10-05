@@ -63,6 +63,11 @@ const mockState = vi.hoisted(() => {
       if (autoEmitReadyToShowOnLoad) this.emitOnce("ready-to-show");
     });
     show = vi.fn();
+    hide = vi.fn();
+    focus = vi.fn();
+    isMinimized = vi.fn(() => false);
+    isDestroyed = vi.fn(() => false);
+    restore = vi.fn();
     webContents = { on: vi.fn(), send: vi.fn(), stop: vi.fn() };
 
     constructor(options: BrowserWindowOptions) {
@@ -98,6 +103,7 @@ const mockState = vi.hoisted(() => {
   const app = {
     name: "Television",
     setName: recorded("app.setName", (_name: string) => {}),
+    requestSingleInstanceLock: recorded("app.requestSingleInstanceLock", () => true),
     whenReady: recorded("app.whenReady", async () => {}),
     getPath: recorded("app.getPath", (_name: string) => "/tmp/television-test-userdata"),
     getVersion: recorded("app.getVersion", () => "0.1.170"),
@@ -208,6 +214,12 @@ describe("Electron main process", () => {
   };
 
   beforeEach(() => {
+    vi.stubEnv("XDG_CURRENT_DESKTOP", "");
+    mockState.app.requestSingleInstanceLock.mockReset().mockImplementation(() => {
+      mockState.callOrder.push("app.requestSingleInstanceLock");
+      return true;
+    });
+    mockState.app.quit.mockClear();
     mockState.MockBrowserWindow.instances.length = 0;
     mockState.appHandlers.clear();
     mockState.ipcHandlers.clear();
@@ -217,7 +229,7 @@ describe("Electron main process", () => {
     mockState.setLoadFileBehavior();
     mockState.app.on.mockClear();
     mockState.app.whenReady.mockClear();
-    mockState.app.whenReady.mockImplementation(async () => {});
+    mockState.app.whenReady.mockImplementation(async () => { mockState.callOrder.push("app.whenReady"); });
     mockState.app.getVersion.mockClear();
     mockState.app.setAboutPanelOptions.mockClear();
     mockState.ipcMain.handle.mockClear();
@@ -461,6 +473,125 @@ describe("Electron main process", () => {
       expect(template.filter(item => item.role === "windowMenu")).toHaveLength(1);
       expect(template.some(item => item.label === "Window")).toBe(false);
     } finally { Object.defineProperty(process, "platform", platform); }
+  });
+
+  // Electron process-boundary contracts; actual OS lock/visibility and retained
+  // live connection are carried by the packaged walk, not this double.
+  // proofs/arch/desktop/linux-distribution.md#^linux-hyprland-session
+  describe("Hyprland Hide lifecycle", () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    beforeEach(() => {
+      Object.defineProperty(process, "platform", { ...platform, value: "linux" });
+      vi.stubEnv("XDG_CURRENT_DESKTOP", "Hyprland");
+    });
+    afterEach(() => { Object.defineProperty(process, "platform", platform); });
+
+    function hideItem() {
+      const template = mockState.Menu.buildFromTemplate.mock.calls.at(-1)![0] as Array<{
+        label?: string; submenu?: Array<{ role?: string; label?: string;
+          click?: (item: unknown, window: InstanceType<typeof mockState.MockBrowserWindow> | undefined) => void }>;
+      }>;
+      return template.find(item => item.label === "Window")!.submenu![0];
+    }
+
+    it.each([
+      ["Hyprland", "Hide", true], [" GNOME : hYpRlAnD :", "Hide", true],
+      ["NotHyprland", "minimize", false], ["Hyprland-session", "minimize", false],
+      ["GNOME", "minimize", false], ["", "minimize", false],
+    ])("selects native window behavior for desktop %j", async (desktop, label, locked) => {
+      vi.stubEnv("XDG_CURRENT_DESKTOP", desktop);
+      const main = await loadAppModule();
+      await new main.App().start();
+      expect(hideItem().label ?? hideItem().role).toBe(label);
+      expect(mockState.app.requestSingleInstanceLock).toHaveBeenCalledTimes(locked ? 1 : 0);
+    });
+
+    it.each(["darwin", "win32"])("does not arbitrate Hyprland-named sessions on %s", async value => {
+      Object.defineProperty(process, "platform", { ...platform, value });
+      const main = await loadAppModule(); await new main.App().start();
+      expect(mockState.app.requestSingleInstanceLock).not.toHaveBeenCalled();
+      expect(mockState.appHandlers.has("second-instance")).toBe(false);
+    });
+
+    // proofs/arch/desktop/linux-distribution.md#^linux-hyprland-lock
+    it("quits a duplicate Hyprland profile before readiness or connection loading", async () => {
+      mockState.app.requestSingleInstanceLock.mockReturnValue(false);
+      const main = await loadAppModule();
+      mockState.app.getPath.mockClear();
+      await new main.App().start();
+      expect(mockState.app.quit).toHaveBeenCalledOnce();
+      expect(mockState.app.whenReady).not.toHaveBeenCalled();
+      expect(mockState.app.getPath).not.toHaveBeenCalled();
+      expect(mockState.MockBrowserWindow.instances).toHaveLength(0);
+      expect(mockState.Menu.setApplicationMenu).not.toHaveBeenCalled();
+    });
+
+    it("acquires the Hyprland profile lock before readiness and connection loading", async () => {
+      mockState.callOrder.length = 0;
+      const main = await loadAppModule(); await new main.App().start();
+      const lock = mockState.callOrder.indexOf("app.requestSingleInstanceLock");
+      expect(lock).toBeGreaterThan(mockState.callOrder.indexOf("app.setName"));
+      expect(lock).toBeLessThan(mockState.callOrder.indexOf("app.whenReady"));
+      expect(lock).toBeLessThan(mockState.callOrder.indexOf("app.getPath"));
+    });
+
+    // proofs/arch/desktop/linux-distribution.md#^linux-hyprland-reveal-contract
+    it("hides only the focused window and safely ignores missing focus", async () => {
+      const main = await loadAppModule(); await new main.App().start();
+      const primary = mockState.MockBrowserWindow.instances[0];
+      const focused = new mockState.MockBrowserWindow({});
+      expect(hideItem().label).toBe("Hide");
+      const hide = hideItem().click!;
+      expect(() => hide(undefined, undefined)).not.toThrow();
+      hide(undefined, focused);
+      expect(focused.hide).toHaveBeenCalledOnce();
+      expect(primary.hide).not.toHaveBeenCalled();
+      expect(mockState.app.quit).not.toHaveBeenCalled();
+      primary.emitOnce("ready-to-show");
+      expect(primary.show).toHaveBeenCalledOnce();
+    });
+
+    it.each(["second-instance", "activate"])("%s reveals the same hidden window without reloading", async event => {
+      const main = await loadAppModule(); await new main.App().start();
+      const win = mockState.MockBrowserWindow.instances[0];
+      const loads = [win.loadFile.mock.calls.length, win.loadURL.mock.calls.length];
+      const saved = [...fsState.files];
+      expect(hideItem().click).toBeTypeOf("function");
+      hideItem().click!(undefined, win);
+      expect(win.hide).toHaveBeenCalledOnce();
+      win.emitOnce("ready-to-show");
+      expect(win.show).not.toHaveBeenCalled();
+      expect(mockState.appHandlers.has(event)).toBe(true);
+      mockState.appHandlers.get(event)!();
+      expect(mockState.MockBrowserWindow.instances).toEqual([win]);
+      expect(win.show).toHaveBeenCalledOnce();
+      expect(win.focus).toHaveBeenCalledOnce();
+      expect([win.loadFile.mock.calls.length, win.loadURL.mock.calls.length]).toEqual(loads);
+      expect([...fsState.files]).toEqual(saved);
+    });
+
+    it("restores native minimized state before showing and requesting focus", async () => {
+      const main = await loadAppModule(); await new main.App().start();
+      const win = mockState.MockBrowserWindow.instances[0];
+      win.isMinimized.mockReturnValue(true);
+      expect(mockState.appHandlers.has("second-instance")).toBe(true);
+      mockState.appHandlers.get("second-instance")!();
+      expect(win.restore).toHaveBeenCalledOnce();
+      expect(win.restore.mock.invocationCallOrder[0]).toBeLessThan(win.show.mock.invocationCallOrder[0]);
+      expect(win.show.mock.invocationCallOrder[0]).toBeLessThan(win.focus.mock.invocationCallOrder[0]);
+    });
+
+    it("keeps the initial window visible after a second launch during readiness", async () => {
+      let ready!: () => void;
+      mockState.app.whenReady.mockImplementation(() => new Promise<void>(resolve => { ready = resolve; }));
+      const main = await loadAppModule(); const start = new main.App().start();
+      expect(mockState.appHandlers.has("second-instance")).toBe(true);
+      mockState.appHandlers.get("second-instance")!();
+      expect(mockState.MockBrowserWindow.instances).toHaveLength(0);
+      ready(); await start;
+      expect(mockState.MockBrowserWindow.instances).toHaveLength(1);
+      expect(mockState.MockBrowserWindow.instances[0].options.show).toBe(true);
+    });
   });
 
   it("makes the Linux release version available through the About menu", async () => {

@@ -1,5 +1,7 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import type { Duplex } from "node:stream";
 import { createServer } from "node:http";
 import { build } from "esbuild";
 import os from "node:os";
@@ -217,5 +219,183 @@ test("packaged Linux preload translates upstream Mac gate markup and preserves L
   } finally {
     await app?.close(); await new Promise<void>(resolve => server.close(() => resolve()));
     rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+// proofs/product/linux-desktop.md#^linux-hyprland-hide-acceptance
+// proofs/arch/desktop/linux-distribution.md#^linux-hyprland-profile-acceptance
+// Actual entrypoint/profile lock and native visibility; Hyprland identity is
+// declared fixture data on private X11/Wayland compositors, not physical proof.
+test("packaged Hyprland Hide restores its live connected window on a second launch", async () => {
+  const compositorDebug = process.env.TV_LINUX_WESTON_DEBUG;
+  const compositorDisplay = process.env.TV_LINUX_WESTON_DISPLAY;
+  test.skip(!compositorDebug || !compositorDisplay, "Hide acceptance requires an exclusive private Weston scene observer");
+  const temporary = mkdtempSync(path.join(os.tmpdir(), "tv-hide-"));
+  const config = path.join(temporary, "config");
+  let server: Awaited<ReturnType<typeof startConnectTestServer>> | undefined;
+  let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
+  let independent: typeof app;
+  let secondary: ReturnType<typeof spawn> | undefined;
+  const waitForExit = async (child: ReturnType<typeof spawn>, timeout: number): Promise<boolean> => {
+    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onExit!: () => void;
+    const exited = new Promise<boolean>(resolve => { onExit = () => resolve(true); child.once("exit", onExit); });
+    try {
+      return await Promise.race([exited, new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), timeout); })]);
+    } finally { clearTimeout(timer); child.off("exit", onExit); }
+  };
+  try {
+    mkdirSync(config);
+    const runningServer = server = await startConnectTestServer({ bundledViews: true });
+    const sockets: Duplex[] = [];
+    runningServer.server.httpServer.on("upgrade", (request, socket) => {
+      if (new URL(request.url!, runningServer.serverURL).pathname === "/events") sockets.push(socket);
+    });
+    const client = new TelevisionClient(runningServer.serverURL, { token: runningServer.token });
+    const { channel } = await client.channels.create({ name: "Hide continuity fixture" });
+    const markdown = path.join(temporary, "retained.md");
+    writeFileSync(markdown, "# Retained live document\n\nDeclared synthetic Hide/reopen acceptance content.\n");
+    await client.artifacts.create({ channelID: channel.id, kind: "path", title: "Retained live document", path: markdown });
+    await client.display.patch({ focusedChannelId: channel.id });
+    const env = { ...process.env, XDG_CONFIG_HOME: config, XDG_CURRENT_DESKTOP: "Hyprland", DO_NOT_TRACK: "1" } as Record<string, string>;
+    delete env.TV_TEST_MODE;
+    if (requireSandbox) delete env.ELECTRON_DISABLE_SANDBOX;
+    const args = !requireSandbox && process.env.ELECTRON_DISABLE_SANDBOX === "1" ? ["--no-sandbox"] : [];
+    const executablePath = path.join(packageDir!, packageLauncher);
+    const primary = app = await electron.launch({ executablePath, args, env, timeout: 20_000 });
+    const page = await primary.firstWindow();
+    const menuLabel = await primary.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.find(item => item.label === "Window")?.submenu?.items[0].label);
+    expect(menuLabel).toBe("Hide");
+    await page.getByRole("textbox", { name: "Link from your agent" }).fill(`${runningServer.serverURL}/?token=${runningServer.token}`);
+    await page.getByRole("textbox", { name: "Link from your agent" }).press("Enter");
+    await expect(page.locator("#app[data-app-state='connected']")).toBeVisible();
+    const guestText = () => primary.evaluate(async ({ webContents }) => Promise.all(webContents.getAllWebContents()
+      .filter(contents => contents.getType() === "webview")
+      .map(contents => contents.executeJavaScript("document.body.innerText").catch(() => ""))));
+    await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Declared synthetic Hide/reopen")]));
+    await expect.poll(() => sockets.length).toBeGreaterThan(0);
+    const originalSockets = [...sockets];
+    const profile = path.join(config, "Television");
+    const saved = readFileSync(path.join(profile, "connection.json"));
+    const state = () => primary.evaluate(({ app, BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      return { mainPID: process.pid, windowID: window.id, contentsID: window.webContents.id,
+        nativeHandle: window.getNativeWindowHandle().toString("hex"),
+        count: BrowserWindow.getAllWindows().length, visible: window.isVisible(),
+        ozone: app.commandLine.getSwitchValue("ozone-platform"),
+        sandboxDisabled: app.commandLine.hasSwitch("no-sandbox"),
+        rendererPID: window.webContents.getOSProcessId(),
+        sandbox: (window.webContents as Electron.WebContents & { getLastWebPreferences(): { sandbox?: boolean } }).getLastWebPreferences().sandbox };
+    });
+    const before = await state();
+    expect(before.visible).toBe(true);
+    const mapped = (stage: string) => {
+      const scene = execFileSync(compositorDebug!, ["scene-graph"], {
+        env: { ...process.env, WAYLAND_DISPLAY: compositorDisplay! }, encoding: "utf8", timeout: 5_000,
+      });
+      if (evidenceDir) { mkdirSync(evidenceDir, { recursive: true }); writeFileSync(path.join(evidenceDir, `hide-${before.ozone}-${stage}-scene.txt`), scene); }
+      // Weston records mapped views, not merely registered surfaces. Native
+      // Wayland identifies the exact Electron PID/app ID. Xwayland supplies its
+      // own PID, so its attribution uses the sole Television title fixture on
+      // this exclusive display plus stable original Electron/native identity.
+      // No independent Television profile starts until this interval finishes.
+      const views = scene.split("\n").filter(line => line.includes("View ") && line.includes("top-level window 'Television'"));
+      expect(views.length).toBeLessThanOrEqual(1);
+      if (before.ozone === "wayland") {
+        return views.some(line => line.includes(`role xdg_toplevel, PID ${before.mainPID},`) && line.includes("of computer.telepath.television"));
+      }
+      expect(before.ozone).toBe("x11");
+      return views.some(line => line.includes("role xwayland,"));
+    };
+    const expectMapping = (visible: boolean, stage: string) => expect.poll(() => mapped(stage), {
+      timeout: 10_000, intervals: [200, 400, 800], message: `Original native window mapped=${visible} (${stage})`,
+    }).toBe(visible);
+    await expectMapping(true, "before");
+    await page.evaluate(() => { Object.assign(window, { hideContinuitySentinel: "retained-document-lifetime" }); });
+    let navigations = 0;
+    page.on("framenavigated", frame => { if (frame === page.mainFrame()) navigations++; });
+    if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `hide-${before.ozone}-before.png`) });
+    const sandboxStatus = (native: typeof before) => {
+      if (!requireSandbox) return undefined;
+      expect(native.sandboxDisabled).toBe(false); expect(native.sandbox).toBe(true);
+      const status = readFileSync(`/proc/${native.rendererPID}/status`, "utf8");
+      const actual = { seccomp: /^Seccomp:\s+(\d+)$/m.exec(status)?.[1], noNewPrivileges: /^NoNewPrivs:\s+(\d+)$/m.exec(status)?.[1] };
+      expect(actual).toEqual({ seccomp: "2", noNewPrivileges: "1" }); return actual;
+    };
+    const sandboxBefore = sandboxStatus(before);
+    const cycles: Array<{ cycle: number; hidden: typeof before; after: typeof before; sandboxAfter: ReturnType<typeof sandboxStatus> }> = [];
+    for (let cycle = 1; cycle <= 5; cycle++) {
+      await primary.evaluate(({ BrowserWindow, Menu }) => {
+        const item = Menu.getApplicationMenu()!.items.find(item => item.label === "Window")!.submenu!.items.find(item => item.label === "Hide")!;
+        item.click(undefined, BrowserWindow.getAllWindows()[0], undefined);
+      });
+      await expect.poll(state).toMatchObject({ ...before, visible: false });
+      await expectMapping(false, `cycle-${cycle}-hidden`);
+      const hidden = await state();
+      const update = `Update received while hidden ${cycle}`;
+      await client.channels.update({ channelID: channel.id, name: update });
+      // Actual entrypoint and profile lock; no injected instance event.
+      const child = secondary = spawn(executablePath, args, { env, stdio: "ignore" });
+      const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
+        child.once("error", reject); child.once("exit", (code, signal) => resolve({ code, signal }));
+      });
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const result = await Promise.race([exited, new Promise<never>((_resolve, reject) => {
+          deadline = setTimeout(() => reject(new Error("Secondary entrypoint did not exit within 15 seconds")), 15_000);
+        })]);
+        expect(result).toEqual({ code: 0, signal: null });
+      } finally { clearTimeout(deadline); }
+      await expect.poll(state).toEqual(before);
+      await expectMapping(true, `cycle-${cycle}-restored`);
+      await page.waitForFunction(() => document.visibilityState === "visible", undefined, { polling: 100, timeout: 10_000 });
+      await page.evaluate(() => {
+        Object.assign(window, { hideRepaintObserved: false });
+        requestAnimationFrame(() => requestAnimationFrame(() => { Object.assign(window, { hideRepaintObserved: true }); }));
+      });
+      await page.waitForFunction(() => (window as typeof window & { hideRepaintObserved?: boolean }).hideRepaintObserved === true,
+        undefined, { polling: 100, timeout: 10_000 });
+      // Final continuity belongs after real remapping/painting, not at the
+      // earlier logical show request where a delayed reload can still follow.
+      expect(await page.evaluate(() => (window as typeof window & { hideContinuitySentinel?: string }).hideContinuitySentinel)).toBe("retained-document-lifetime");
+      expect(navigations).toBe(0);
+      await expect(page.getByText(update, { exact: true }).first()).toBeVisible();
+      await expect(page.locator("#app[data-app-state='connected']")).toBeVisible();
+      await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Declared synthetic Hide/reopen")]));
+      expect(readFileSync(path.join(profile, "connection.json"))).toEqual(saved);
+      expect(sockets).toEqual(originalSockets);
+      expect(originalSockets.every(socket => !socket.destroyed)).toBe(true);
+      const after = await state(); expect(after).toEqual(before);
+      cycles.push({ cycle, hidden, after, sandboxAfter: sandboxStatus(after) });
+    }
+    if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `hide-${before.ozone}-restored.png`) });
+    independent = await electron.launch({ executablePath, args, env: { ...env, XDG_CONFIG_HOME: path.join(temporary, "independent") }, timeout: 20_000 });
+    await expect((await independent.firstWindow()).locator(".setup-screen")).toBeVisible();
+    const otherPID = await independent.evaluate(() => process.pid);
+    expect(otherPID).not.toBe(before.mainPID); expect(await state()).toEqual(before);
+    if (evidenceDir) writeFileSync(path.join(evidenceDir, `hide-${before.ozone}-acceptance.json`), JSON.stringify({
+      packageLauncher, desktopIdentityFixture: "Hyprland", before, cycles,
+      compositorObserver: "Exclusive private Weston mapped scene views",
+      x11SceneAttribution: "Sole Television title fixture; stable Electron/native identity, not direct XID attribution",
+      secondaryExited: true, retainedDocumentSentinel: true, navigations,
+      savedConnectionIdentical: true, liveEventSocketsRetained: true,
+      updateWhileHiddenReceived: true, independentProfilePID: otherPID,
+      sandboxBefore, physicalHyprlandAccepted: false,
+    }, null, 2) + "\n");
+  } finally {
+    try {
+      if (secondary && secondary.exitCode === null && secondary.signalCode === null && secondary.pid !== undefined) {
+        secondary.kill("SIGTERM");
+        if (!await waitForExit(secondary, 5_000)) {
+          secondary.kill("SIGKILL");
+          expect(await waitForExit(secondary, 5_000), "Owned secondary terminated before profile removal").toBe(true);
+        }
+      }
+    } finally {
+      await independent?.close().catch(() => {});
+      await app?.close().catch(() => {});
+      try { await server?.dispose(); } finally { rmSync(temporary, { recursive: true, force: true }); }
+    }
   }
 });

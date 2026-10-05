@@ -88,6 +88,7 @@ describe("connect flow", () => {
   const storePath = "/tmp/television-connect-flow/connection.json";
 
   beforeEach(() => {
+    vi.stubEnv("XDG_CURRENT_DESKTOP", "");
     vi.useFakeTimers();
     mockState.MockBrowserWindow.instances.length = 0;
     mockState.ipcHandlers.clear();
@@ -102,6 +103,7 @@ describe("connect flow", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   async function startApp() {
