@@ -26,6 +26,12 @@ Hide preserves normal, floating and maximized state. Fullscreen/grouped windows 
 
 Move the Linux window using its native titlebar or compositor bindings. Unlike the frameless Mac window, page content such as the sidebar/top-bar and modal strips does not drag the framed Linux window. Physical titlebar dragging and keyboard input need host acceptance independently of programmatic window operations.
 
+## Local tray candidate
+
+The tray candidate adds a Television icon with **Show Television**, **Hide Television**, the saved server address, **Disconnect from Server**, **About Television** and **Quit**. Icon activation also restores the owned window. Hide preserves the document and connection; on Hyprland it uses the same guarded special-workspace placement as launcher recovery. Disconnect forgets the saved connection and reveals setup. The saved-server line contains no token and does not claim live connectivity.
+
+Closing the native window still quits. The tray is available while Television runs, and it never stops the agent's server. On Omarchy, an unpinned tray item appears in the tray drawer; pin it from the tray's management menu to keep it visible. This change is a local candidate, separate from the published Linux release.
+
 ## Updates
 
 A Linux build checks for AppImage updates only when its maintainer configures an HTTPS release feed. A configured URL alone does not establish that the feed is maintained or available. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
