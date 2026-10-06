@@ -174,7 +174,8 @@ const visibilityBoundary=vi.hoisted(() => {
   let notificationSupported=true;
   class Notification {
     static isSupported() {return notificationSupported;}
-    constructor(private options:{title:string;body:string}) {}
+    private options:{title:string;body:string};
+    constructor(options:{title:string;body:string}) {this.options=options;}
     show() {notifications.push(this.options);}
   }
   function owned(owner:WindowOwner):Extract<CompositorObservation,{status:"owned"}> {
