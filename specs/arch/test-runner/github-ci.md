@@ -106,7 +106,7 @@ The shard worker's owner-lifecycle supervisor and leak detector (contracts owned
 - The current required set: `ss` (iproute2) and a readable `/proc` (procfs) for socket-to-process attribution. The owning spec for the leak detector defines what it does with them; this spec guarantees the environment provides them.
 - Changes to the required tool set land here and in the workflow's assert/install step in the same change.
 
-The Linux unit job also requires `desktop-file-validate` from `desktop-file-utils` for the downstream installer's real desktop-entry validation. CI asserts it is present or installs that package before running the unit suite, including on dependency-cache hits. A missing validator fails the setup or test; it does not skip desktop-entry validation. This host-tool setup does not change dependency-cache identity, browser preparation, artifact transfer or failure propagation.
+The Linux unit job also requires `desktop-file-validate` from `desktop-file-utils` for the downstream installer's real desktop-entry validation and `/usr/bin/luajit` from `luajit` for the Hyprland control test's real Lua string round-trip. Before running the unit suite, including on dependency-cache hits, CI asserts both executables are available or installs both packages in one batch after a single `sudo -v`. Setup then asserts the validator is on PATH, `/usr/bin/luajit` is executable, and the interpreter runs successfully. A missing tool fails setup or its test; neither assertion is skipped. This host-tool setup does not change dependency-cache identity, browser preparation, artifact transfer or failure propagation.
 
 ## CI worker counts
 

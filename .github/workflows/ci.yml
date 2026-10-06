@@ -221,16 +221,18 @@ jobs:
             || echo "::warning::electron-readiness phase metric recorder crashed"
           exit "$status"
 
-      - name: Assert or install Linux desktop entry validator
+      - name: Assert or install Linux unit host tools
         if: ${{ (needs.attest-check.outputs.skip != 'true' || needs.attest-check.outputs.authorized != 'true') && matrix.suite.name == 'unit' }}
         run: |
-          if ! command -v desktop-file-validate >/dev/null 2>&1; then
-            echo "Installing desktop-file-utils for Linux installer validation"
+          if ! command -v desktop-file-validate >/dev/null 2>&1 || ! test -x /usr/bin/luajit; then
+            echo "Installing desktop-file-utils and luajit for Linux unit tests"
             sudo -v || exit 1
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends desktop-file-utils
+            sudo apt-get install -y --no-install-recommends desktop-file-utils luajit
           fi
           command -v desktop-file-validate
+          test -x /usr/bin/luajit
+          /usr/bin/luajit -v
 
       - name: Run ${{ matrix.suite.name }}
         if: ${{ (needs.attest-check.outputs.skip != 'true' || needs.attest-check.outputs.authorized != 'true') }}
