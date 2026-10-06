@@ -21,7 +21,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
   - `desktop-app.md` (60 lines) — *The desktop application users download: its Mac installer and download link, the platforms it supports, Television identity and saved data, and the npm package that distributed releases through 1.3.x.*
   - `keyboard-navigation.md` (51 lines) — *How the keyboard moves through the app: the navigation chord that steps between tab pages and between channels, where it always works, and the one place it can't.*
   - `licensing.md` (109 lines) — *Television's licensing promises: the project is MIT and every published package and the desktop application say so, every shipped artifact carries the licenses and attributions of the third-party code and assets it redistributes, and the standard test suites block unacceptably-licensed dependencies from shipping.*
-  - `linux-desktop.md` (15 lines) — *The downstream Linux desktop's platform behavior, compatibility and host acceptance requirements.*
+  - `linux-desktop.md` (17 lines) — *The downstream Linux desktop's platform behavior, compatibility and host acceptance requirements.*
   - `tab-pages.md` (60 lines) — *What tab pages promise the user: one tab per page of the focused channel, labeled by its artifact, stepped through by tab or keyboard, with selection private to each browser.*
   - `telemetry.md` (325 lines) — *Anonymous, opt-out product telemetry: what Television measures about how early users use it, the privacy guarantees that bound what is collected, and the disclosure and opt-out behavior users get.*
   - `themes-and-appearance.md` (125 lines) — *Themes and appearance: how people choose a server-wide installed theme, use its CSS and JavaScript visual surfaces, grant per-theme consent for main-page JavaScript, and set the light, dark, or system preference that the active theme resolves into appearance.*
@@ -118,7 +118,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
   - **app/**
     - `index.md` (117 lines) — *UI spec: the app shell — its two interface regions and the noninteractive visual layers that installed themes can place around them.*
     - **artifact-frame/**
-      - `index.md` (66 lines) — *UI spec: the artifact frame — the surface that holds one artifact's document.*
+      - `index.md` (70 lines) — *UI spec: the artifact frame — the surface that holds one artifact's document.*
     - **copy-button/**
       - `index.md` (45 lines) — *UI spec: the copy button — a control that copies a value and briefly confirms, without resizing.*
     - **desktop-upgrade-gate/**

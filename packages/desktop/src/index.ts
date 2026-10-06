@@ -4,12 +4,16 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  Notification,
   shell,
   type MenuItemConstructorOptions,
 } from "electron";
 import { classifyLinkTarget } from "@telepath-computer/television-artifact/link-target";
 import { startDesktopUpdates } from "./update-runtime.ts";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { createHyprlandControl } from "./hyprland-control.ts";
+import { createHyprlandVisibility, type HyprlandVisibilityController } from "./hyprland-visibility.ts";
 import { buildRemoteURL, ConnectURLError, parseDesktopConnectURL, resolveDesktopAppVersion } from "./connect-url.ts";
 import { preflightConnection } from "./connect-preflight.ts";
 import { loadConnection, saveConnection, deleteConnection, type Connection } from "./connection-store.ts";
@@ -140,8 +144,44 @@ export class App {
   private retryDelay = INITIAL_RETRY_MS;
   private pendingNavigation: { attempt: number; connection: Connection; version: string } | null = null;
   private localPage = false;
+  private visibility: HyprlandVisibilityController | null = null;
+  private readonly visibilityCleanups = new Set<Promise<void>>();
+  private quitCleanupStarted = false;
+  private quitCleanupComplete = false;
+
+  private disposeVisibility(controller: HyprlandVisibilityController | null): void {
+    if (!controller) return;
+    const cleanup = Promise.resolve(controller.dispose()).catch(() => {
+      console.warn("Television could not confirm compositor observer cleanup.");
+    });
+    this.visibilityCleanups.add(cleanup);
+    void cleanup.then(() => this.visibilityCleanups.delete(cleanup));
+  }
+  private readonly isHyprland = process.platform === "linux"
+    && (process.env.XDG_CURRENT_DESKTOP ?? "").split(":")
+      .some(desktop => desktop.trim().toLowerCase() === "hyprland");
 
   async start(): Promise<void> {
+    if (this.isHyprland) {
+      // Electron scopes the lock to this application's user-data profile.
+      if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+      app.on("second-instance", () => this.revealWindow());
+      app.on("will-quit", event => {
+        if (this.quitCleanupComplete) return;
+        event.preventDefault();
+        if (this.quitCleanupStarted) return;
+        this.quitCleanupStarted = true;
+        this.disposeVisibility(this.visibility);
+        void Promise.all([...this.visibilityCleanups]).then(() => {
+          // Leave Electron's native will-quit stack before re-entering Quit.
+          // An already-resolved cleanup can flush its microtasks before the native quitting flag resets.
+          setImmediate(() => {
+            this.quitCleanupComplete = true;
+            app.quit();
+          });
+        });
+      });
+    }
     await app.whenReady();
     if (process.platform === "darwin") {
       app.setAboutPanelOptions({
@@ -175,9 +215,19 @@ export class App {
       if (process.platform !== "darwin") app.quit();
     });
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
+      if (this.isHyprland && this.window) this.revealWindow();
+      else if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
     });
     await this.createWindow();
+  }
+
+  private revealWindow(): void {
+    const window = this.window;
+    // A launch during readiness is fulfilled by the visible initial window.
+    if (!window || window.isDestroyed()) return;
+    if (window.isMinimized()) window.restore();
+    if (this.isHyprland) void this.visibility?.request(true);
+    else { window.show(); window.focus(); }
   }
 
   private async createWindow(): Promise<void> {
@@ -201,6 +251,23 @@ export class App {
         webviewTag: true,
       },
     });
+    const window = this.window;
+    if (this.isHyprland) {
+      this.disposeVisibility(this.visibility);
+      const session = process.env.HYPRLAND_INSTANCE_SIGNATURE ?? "";
+      this.visibility = createHyprlandVisibility({
+        owner: {pid:process.pid,applicationID:"computer.telepath.television",session,marker:randomUUID()},
+        transport:createHyprlandControl({session}),
+        notify:message => {
+          if (this.window !== window || window.isDestroyed()) return;
+          try {
+            if (Notification.isSupported()) new Notification({title:"Television",body:message}).show();
+            else console.warn(message);
+          } catch { console.warn(message); }
+        },
+      });
+    }
+    const visibility = this.visibility;
     this.window.webContents.on("will-attach-webview", (_event, webPreferences) => {
       webPreferences.preload = path.join(__dirname, "webview-bridge-preload.cjs");
       webPreferences.contextIsolation = false;
@@ -213,8 +280,15 @@ export class App {
       if (validatedURL.startsWith("file:") || this.localPage) return;
       void this.loadConnectScreen();
     });
-    this.window.once("ready-to-show", () => this.window?.show());
+    this.window.once("ready-to-show", () => {
+      if (this.window !== window || window.isDestroyed()) return;
+      // Linux is visible from construction; compositor intent owns Hyprland afterwards.
+      if (!this.isHyprland) window.show();
+    });
     this.window.on("closed", () => {
+      this.disposeVisibility(visibility);
+      if (this.window !== window) return;
+      this.visibility = null;
       this.cancelConnectionWork();
       this.window = null;
     });
@@ -416,7 +490,31 @@ export class App {
       },
       { role: "editMenu" },
       { role: "viewMenu" },
-      { role: "windowMenu" },
+      process.platform === "linux"
+        ? {
+            label: "Window",
+            submenu: [
+              this.isHyprland
+                ? {
+                    label: "Hide",
+                    click: (_item, window) => {
+                      if (!window || window !== this.window || window.isDestroyed()) return;
+                      void this.visibility?.request(false);
+                    },
+                  }
+                : { role: "minimize" },
+              {
+                label: "Maximize / Restore",
+                click: (_item, window) => {
+                  if (!window) return;
+                  if (window.isMaximized()) window.unmaximize();
+                  else window.maximize();
+                },
+              },
+              { role: "close" },
+            ],
+          }
+        : { role: "windowMenu" },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
   }

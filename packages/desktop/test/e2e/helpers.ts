@@ -82,6 +82,79 @@ export interface LaunchedDesktop {
   userDataDir?: string;
 }
 
+
+/** Real pointer activation through the visible embedder, with guest receipt. */
+export async function clickVisibleWebviewLink(
+  app: ElectronApplication,
+  page: Page,
+  selector: string,
+  button: "left" | "middle" = "left",
+): Promise<void> {
+  const frame = page.locator(".artifact-view webview.artifact-content:visible");
+  await expect(frame).toHaveCount(1);
+  const guestID = await frame.evaluate((element) =>
+    (element as Electron.WebviewTag).getWebContentsId()
+  );
+  await app.evaluate(({ BrowserWindow, webContents }, id) => {
+    const host = webContents.fromId(id)?.hostWebContents;
+    const owner = host && BrowserWindow.fromWebContents(host);
+    if (!owner) throw new Error("Visible webview has no native window");
+    owner.focus();
+  }, guestID);
+  await expect.poll(() => app.evaluate(({ BrowserWindow, webContents }, id) => {
+    const host = webContents.fromId(id)?.hostWebContents;
+    return !!host && BrowserWindow.fromWebContents(host)?.isFocused();
+  }, guestID)).toBe(true);
+
+  const buttonNumber = button === "left" ? 0 : 1;
+  const activation = button === "left" ? "click" : "auxclick";
+  const point = await app.evaluate(async ({ webContents }, input) => {
+    const guest = webContents.fromId(input.guestID);
+    if (!guest) throw new Error("Visible webview was destroyed");
+    return await guest.executeJavaScript(`(() => {
+      const selector = ${JSON.stringify(input.selector)};
+      const target = document.querySelector(selector);
+      if (!target) throw new Error("Visible link not found");
+      const rect = target.getBoundingClientRect();
+      const receipt = { events: [] };
+      const types = ["mousedown", "mouseup", ${JSON.stringify(input.activation)}];
+      const record = event => {
+        if (event.button !== ${input.buttonNumber}) return;
+        receipt.events.push({
+          type: event.type, button: event.button, trusted: event.isTrusted,
+          target: event.target instanceof Element && event.target.closest(selector) === target,
+        });
+      };
+      for (const type of types) document.addEventListener(type, record, true);
+      receipt.cleanup = () => {
+        for (const type of types) document.removeEventListener(type, record, true);
+      };
+      window.__tvTestLinkGesture = receipt;
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    })()`) as { x: number; y: number };
+  }, { guestID, selector, activation, buttonNumber });
+
+  try {
+    // Locator actionability and Chromium hit-testing deliver one real gesture
+    // through the host. Direct guest sendInputEvent can lose early input.
+    await frame.click({ position: point, button });
+    await expect.poll(() => app.evaluate(async ({ webContents }, id) => {
+      const guest = webContents.fromId(id);
+      if (!guest) throw new Error("Visible webview was destroyed");
+      return await guest.executeJavaScript("window.__tvTestLinkGesture.events");
+    }, guestID)).toEqual(["mousedown", "mouseup", activation].map((type) => ({
+      type, button: buttonNumber, trusted: true, target: true,
+    })));
+  } finally {
+    await app.evaluate(async ({ webContents }, id) => {
+      const guest = webContents.fromId(id);
+      if (guest && !guest.isDestroyed()) {
+        await guest.executeJavaScript("window.__tvTestLinkGesture.cleanup(); delete window.__tvTestLinkGesture");
+      }
+    }, guestID);
+  }
+}
+
 function desktopLaunchEnv(overrides: Record<string, string | undefined> = {}): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {

@@ -105,6 +105,8 @@ npx playwright install --with-deps chromium
 
 Linux system dependencies may require privileges. The preflight spec (`specs/arch/test-runner/preflight.md`, “Execution-host capability checks”) governs process-inspection capabilities; the Electron harness (`specs/arch/desktop/e2e-harness.md`) handles headless testing. Resolve harness permission failures for required processes or sockets through its permission controls.
 
+Linux unit tests also use the real `desktop-file-validate` utility from `desktop-file-utils` and the real `/usr/bin/luajit` interpreter from `luajit`. Install those packages with the distribution's package manager when needed, then check `command -v desktop-file-validate`, `test -x /usr/bin/luajit`, and `/usr/bin/luajit -v`. CI supplies both tools before the unit suite even when workspace dependencies are cached (`specs/arch/test-runner/github-ci.md`, “Tool prerequisites on CI workers”).
+
 ## Isolation
 
 Setup must work when ten agents run it in ten worktrees on one host, and when the checkout’s code does not build or run. It changes host-wide state only for tools, access, and the developer telemetry marker. It never makes one checkout the host’s Television: it does not link or install the checkout’s `tv` into the npm global root, does not install the checkout’s bundled product skills into the developer’s agent directories, and does not build or start the app. Leave any existing `tv` installation or persisted service as you found it. Starting the app belongs to a task; [tvdev-contribute](../tvdev-contribute/SKILL.md) says how to keep that isolated too.
