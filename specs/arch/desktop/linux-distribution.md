@@ -20,4 +20,39 @@ The preload also maintains a narrow compatibility observer for the known upstrea
 
 The Linux main process selects the Hyprland behavior when a colon-separated `XDG_CURRENT_DESKTOP` entry equals `Hyprland`, ignoring case and surrounding whitespace. In that session, startup obtains Electron's single-instance lock for its application profile before waiting for readiness or loading a connection. A process that loses the lock quits without creating a window or loading a connection. Other sessions retain their existing startup and native Minimize behavior. ^linux-hyprland-instance
 
-Hyprland's Hide menu action hides the focused native window without closing it. Opening the same profile again restores its existing minimized window when needed, shows it and requests focus, without reloading its page or connection. Activation received during initial startup leaves the first window visible once created. A late ready-to-show event must not undo a requested Hide. Operating-system focus policy may decide how a shown window receives attention. ^linux-hyprland-reveal
+Hyprland's Hide/reveal path uses a main-process visibility controller and a local compositor transport, never Electron `BrowserWindow.hide()`. The transport initially supports verified Hyprland 0.56.2 Lua query/dispatch/event capabilities; other versions remain unavailable until separately verified. Session-name detection selects the menu and profile lock, while verified compositor identity/capability gates movement. An unavailable API must not fall back to the failing Electron Hide path. Electron 43.7.6 remains pinned. ^linux-hyprland-adapter
+
+Only the live owned main window is eligible. Bootstrap requires an unambiguous compositor client with the main process PID and exact Television application identity, validated inside the action, then binds its address to a random per-window marker and the captured compositor session. Every mutation validates that same ownership within the compositor before acting. Missing, ambiguous, destroyed/replaced or wrong-session targets must not affect another client. Markers are collision/stale-target defenses, not authentication against all programs sharing the user account. ^linux-hyprland-owner
+
+Hide moves that window to its own inactive named special workspace without following it. The destination must be inactive on every monitor; an exposed destination requires a fresh owned inactive one or refusal. Restore moves the same window to its recorded origin and requests focus. Placement and recovery policy follow [the product promises](../../product/linux-desktop.md#^linux-hyprland-placement). Do not create persistent settings, rules or bindings. A new process must not adopt an old process's window. Transient markers, observers and child processes are cleanup-owned. ^linux-hyprland-reveal
+
+The controller records desired visibility before dispatch, serializes reconciliation and verifies actual workspace/output visibility before reporting an outcome. Repeated Hide preserves its origin. Early same-profile activation records a desired visible state fulfilled once the first window exists; late readiness must not undo Hide. A pending old operation cannot defeat a newer launcher request or a person's manual placement. Each minted action carries both an application request revision and the observed external-change revision; within the same compositor action, reject stale application revisions or a mismatched external revision before mutation. Manual movement/reveal increments the compositor's external revision, including when a higher application revision has not yet arrived. Do not refresh a stale action's external fence at execution. Own confirmed moves are distinguished from manual changes. Operating-system focus policy still governs attention. ^linux-hyprland-ordering
+
+Control uses shell-free `hyprctl` argument vectors against the captured session with a two-second command deadline and one-MiB output ceiling. Lua string data is encoded rather than interpolated as code. Visible-state observation is bounded by ten seconds; command exit or acknowledgement is insufficient for success. A timed-out child may already have issued a command, so ownership/intended action survive for reconciliation. Continuing control loss returns pending/failed restore, preserves the original window and emits the product's nonintrusive notification; later launcher activation retries without replacing the document or endless background retries. Disposal invalidates old callbacks/actions and releases only owned transient resources. ^linux-hyprland-control
+
+The controller/transport contracts are:
+
+```ts
+type VisibilityOutcome = { status: 'visible' | 'hidden' | 'pending' | 'refused'; reason?: string };
+type WindowOwner = { pid: number; applicationID: string; session: string; marker: string; address?: string };
+type VisibilityIntent = { owner: WindowOwner; revision: number; expectedExternalRevision: number;
+  visible: boolean; originWorkspace?: number; holdingWorkspace?: string };
+type CompositorObservation =
+  | { status: 'unavailable'; reason: string }
+  | { status: 'missing' | 'ambiguous' | 'replaced' }
+  | { status: 'owned'; owner: WindowOwner; workspace: number; workspaceName: string;
+      visibleOnMonitors: number[]; existingWorkspaces: number[]; normalWorkspaces: number[];
+      activeNormalWorkspace: number | null; supportedWindowState: boolean; externalRevision: number };
+interface HyprlandTransport {
+  inspect(owner: WindowOwner): Promise<CompositorObservation>;
+  apply(intent: VisibilityIntent): Promise<{ acknowledged: boolean }>;
+  watch(owner: WindowOwner, changed: () => void): () => void;
+  dispose(): void;
+}
+interface HyprlandVisibilityController {
+  request(visible: boolean): Promise<VisibilityOutcome>;
+  dispose(): void;
+}
+```
+
+`createHyprlandControl(options: { session: string }): HyprlandTransport` constructs the real local transport. `createHyprlandVisibility(options: { owner: WindowOwner; transport: HyprlandTransport; notify: (message: string) => void }): HyprlandVisibilityController` constructs the controller. Main-process code keeps the existing profile lock, connection/navigation state and native window lifetime; no renderer or installer interface changes. ^linux-hyprland-contract

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](2026-10-05-hyprland-compositor-hide-design.md). The human approved this design on October 5, 2026. Its conversion into governing product/architecture specs and independent spec/proof gates is Task 1; this plan does not silently replace them.
 
-**Status:** Plan for review; execution method not selected. No compositor implementation, passing replacement acceptance or release readiness is claimed. Starting tree: `78746c9eb4882a72529f4c0e89ad8c3704c88a72` on `fix/linux-window-menu`.
+**Status:** Human approved; native implementation in this chat with repository-required independent gates. Task 1 spec/proof derivation converged. No compositor implementation, passing replacement acceptance or release readiness is claimed. Starting tree: `78746c9eb4882a72529f4c0e89ad8c3704c88a72` on `fix/linux-window-menu`.
 
 ## Global constraints
 
@@ -55,11 +55,11 @@ No installer, launcher, updater, server or renderer redesign is expected. Report
 
 **Interfaces:** Consumes the approved design. Produces independently converged requirements and anchored proof obligations for Tasks 2–4.
 
-- [ ] **Step 1:** Update `^linux-hyprland-hide` and the architecture lifecycle anchors. Replace the current Electron show/hide promise with origin-workspace restoration, manual-change precedence, unavailable-control notification/retry, unsupported-state refusal and exact-window continuity. Resolve the focused-window wording: only the owned main window is controllable; no focused window is a safe no-op and an unrelated focused window is never moved.
-- [ ] **Step 2:** State the supported version/capability boundary. Initial adapter targets verified Hyprland 0.56.2 Lua APIs; other versions are unavailable until separately verified. Session-name matching still selects the menu/profile lock; actual compositor verification selects whether Hide can execute. Unknown session/API leaves the window visible with an explanation.
-- [ ] **Step 3:** Independently converge every spec delta using the repository's exact `xhigh` reviewer gate. Human review of the actual spec deltas remains due before their first shared-branch merge; do not reinterpret proposal approval as line review of future edits.
-- [ ] **Step 4:** Derive and independently converge proof assertions. Controller doubles replace only transport/Electron boundaries; real generated-action seam tests forfeit GUI semantics to the actual Hyprland spine. Replace fake `XDG_CURRENT_DESKTOP=Hyprland` on Weston as acceptance of this mechanism. Preserve previous failing evidence and ordinary Weston coverage with honest session identity.
-- [ ] **Step 5:** Reconcile this plan with the converged specs/proofs. Any changed human intent returns to the human; derivable details remain autonomous. Commit the spec/proof/planning checkpoint locally with no co-author trailer.
+- [x] **Step 1:** Update `^linux-hyprland-hide` and the architecture lifecycle anchors. Replace the current Electron show/hide promise with origin-workspace restoration, manual-change precedence, unavailable-control notification/retry, unsupported-state refusal and exact-window continuity. Resolve the focused-window wording: only the owned main window is controllable; no focused window is a safe no-op and an unrelated focused window is never moved.
+- [x] **Step 2:** State the supported version/capability boundary. Initial adapter targets verified Hyprland 0.56.2 Lua APIs; other versions are unavailable until separately verified. Session-name matching still selects the menu/profile lock; actual compositor verification selects whether Hide can execute. Unknown session/API leaves the window visible with an explanation.
+- [x] **Step 3:** Independently converge every spec delta using the repository's exact `xhigh` reviewer gate. Human review of the actual spec deltas remains due before their first shared-branch merge; do not reinterpret proposal approval as line review of future edits.
+- [x] **Step 4:** Derive and independently converge proof assertions. Controller doubles replace only transport/Electron boundaries; real generated-action seam tests forfeit GUI semantics to the actual Hyprland spine. Replace fake `XDG_CURRENT_DESKTOP=Hyprland` on Weston as acceptance of this mechanism. Preserve previous failing evidence and ordinary Weston coverage with honest session identity.
+- [x] **Step 5:** Reconcile this plan with the converged specs/proofs. Any changed human intent returns to the human; derivable details remain autonomous. Commit the spec/proof/planning checkpoint locally with no co-author trailer.
 
 ### Task 2: Owned-window controller and Hyprland transport
 
@@ -76,7 +76,7 @@ type CompositorObservation =
   | { status: 'unavailable'; reason: string }
   | { status: 'missing' | 'ambiguous' | 'replaced' }
   | { status: 'owned'; owner: WindowOwner; workspace: number; workspaceName: string;
-      visibleOnMonitors: number[]; normalWorkspaces: number[];
+      visibleOnMonitors: number[]; existingWorkspaces: number[]; normalWorkspaces: number[];
       activeNormalWorkspace: number | null; supportedWindowState: boolean; externalRevision: number };
 interface HyprlandTransport {
   inspect(owner: WindowOwner): Promise<CompositorObservation>;
