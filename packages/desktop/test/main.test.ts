@@ -128,6 +128,25 @@ const mockState = vi.hoisted(() => {
     buildFromTemplate: vi.fn((template: unknown) => template),
     setApplicationMenu: vi.fn(),
   };
+  type TrayItem = { label?: string; enabled?: boolean; role?: string; click?: () => void | Promise<void> };
+  class MockTray {
+    static instances: MockTray[] = [];
+    static failConstruction = false;
+    menu: TrayItem[] = [];
+    tooltip = "";
+    handlers = new Map<string, () => void>();
+    destroyed = false;
+    readonly icon: string;
+    constructor(icon: string) {
+      this.icon = icon;
+      if (MockTray.failConstruction) throw new Error("Tray unavailable");
+      MockTray.instances.push(this);
+    }
+    setContextMenu(menu: TrayItem[]) { this.menu = menu; }
+    setToolTip(value: string) { this.tooltip = value; }
+    on(event: string, callback: () => void) { this.handlers.set(event, callback); }
+    destroy() { this.destroyed = true; }
+  }
   const ipcMain = {
     handle: vi.fn((channel: string, handler: IpcHandler) => {
       ipcHandlers.set(channel, handler);
@@ -148,6 +167,7 @@ const mockState = vi.hoisted(() => {
     MockBrowserWindow,
     app,
     Menu,
+    MockTray,
     ipcMain,
     nativeTheme,
     shell,
@@ -201,6 +221,7 @@ vi.mock("electron", () => ({
   app: mockState.app,
   BrowserWindow: mockState.MockBrowserWindow,
   Menu: mockState.Menu,
+  Tray: mockState.MockTray,
   ipcMain: mockState.ipcMain,
   nativeTheme: mockState.nativeTheme,
   shell: mockState.shell,
@@ -248,6 +269,7 @@ describe("Electron main process", () => {
   };
 
   beforeEach(() => {
+    mockState.MockTray.instances.length = 0; mockState.MockTray.failConstruction = false;
     visibilityBoundary.entries.length=0;visibilityBoundary.notifications.length=0;visibilityBoundary.setSupported(true);
     vi.stubEnv("XDG_CURRENT_DESKTOP", "");
     mockState.app.requestSingleInstanceLock.mockReset().mockImplementation(() => {
@@ -291,6 +313,135 @@ describe("Electron main process", () => {
   async function loadAppModule() {
     return await import("@telepath-computer/television-desktop");
   }
+
+  // proofs/arch/desktop/linux-distribution.md#^linux-tray-contract
+  describe("Linux tray", () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    beforeEach(() => Object.defineProperty(process, "platform", {...platform, value: "linux"}));
+    afterEach(() => Object.defineProperty(process, "platform", platform));
+    const tray = () => mockState.MockTray.instances[0];
+    const item = (label: string) => {
+      const found = tray()?.menu.find(entry => entry.label === label);
+      expect(found, `exported tray menu item ${label}`).toBeDefined();
+      return found!;
+    };
+
+    it("exports the Linux tray with setup and application commands", async () => {
+      const main = await loadAppModule(); await new main.App().start();
+      expect(mockState.MockTray.instances).toHaveLength(1);
+      expect(tray().icon).toMatch(/assets[/\\]icon\.png$/);
+      expect(tray().tooltip).toBe("Television");
+      expect(item("Disconnect from Server").enabled).toBe(false);
+      expect(tray().menu.some(i => i.label === "No saved server" && i.enabled === false)).toBe(true);
+      expect(tray().menu.some(i => i.role === "about")).toBe(true);
+      expect(tray().menu.some(i => i.role === "quit")).toBe(true);
+    });
+
+    it.each(["darwin", "win32"])("does not create a Linux tray on %s", async value => {
+      Object.defineProperty(process, "platform", {...platform, value});
+      const main = await loadAppModule(); await new main.App().start();
+      expect(mockState.MockTray.instances).toHaveLength(0);
+    });
+
+    it("hides and restores the owned window, restoring minimized state without navigation", async () => {
+      const main = await loadAppModule(); await new main.App().start();
+      const owned = mockState.MockBrowserWindow.instances[0];
+      const unrelated = new mockState.MockBrowserWindow({});
+      const loads = [owned.loadFile.mock.calls.length, owned.loadURL.mock.calls.length];
+      await item("Hide Television").click!();
+      expect(owned.hide).toHaveBeenCalledOnce(); expect(unrelated.hide).not.toHaveBeenCalled();
+      owned.isMinimized.mockReturnValue(true);
+      await item("Show Television").click!();
+      expect(owned.restore).toHaveBeenCalledOnce(); expect(owned.show).toHaveBeenCalledOnce();
+      expect(owned.focus).toHaveBeenCalledOnce();
+      tray().handlers.get("click")!();
+      expect(owned.show).toHaveBeenCalledTimes(2);
+      expect([owned.loadFile.mock.calls.length, owned.loadURL.mock.calls.length]).toEqual(loads);
+      expect(mockState.app.quit).not.toHaveBeenCalled();
+    });
+
+    it("keeps early tray Hide in effect after the native Linux window finishes loading", async () => {
+      const main=await loadAppModule(); await new main.App().start();
+      const owned=mockState.MockBrowserWindow.instances[0];
+      await item("Hide Television").click!(); owned.emitOnce("ready-to-show");
+      expect(owned.hide).toHaveBeenCalledOnce(); expect(owned.show).not.toHaveBeenCalled();
+      await item("Show Television").click!(); expect(owned.show).toHaveBeenCalledOnce();
+    });
+
+    it("routes tray Hide and Show through real Hyprland ownership independently of unrelated focus", async () => {
+      vi.stubEnv("XDG_CURRENT_DESKTOP", "Hyprland"); vi.stubEnv("HYPRLAND_INSTANCE_SIGNATURE", "fixture_123_456");
+      const main = await loadAppModule(); await new main.App().start();
+      const owned = mockState.MockBrowserWindow.instances[0];
+      new mockState.MockBrowserWindow({});
+      const loads = [owned.loadFile.mock.calls.length, owned.loadURL.mock.calls.length];
+      await item("Hide Television").click!();
+      await vi.waitFor(() => expect(visibilityBoundary.entries[0].state).toMatchObject({visibleOnMonitors:[]}));
+      await item("Show Television").click!();
+      await vi.waitFor(() => expect(visibilityBoundary.entries[0].state).toMatchObject({workspace:7,visibleOnMonitors:[0]}));
+      expect(visibilityBoundary.entries[0].actions.map(i=>i.visible)).toEqual([false,true]);
+      expect(owned.hide).not.toHaveBeenCalled(); expect(owned.show).not.toHaveBeenCalled();
+      expect([owned.loadFile.mock.calls.length, owned.loadURL.mock.calls.length]).toEqual(loads);
+    });
+
+    it("refreshes credential-free saved-server state and Disconnect clears it and reveals setup", async () => {
+      fetchMock.mockImplementation(async () => new Response(JSON.stringify(connectCheckBody), {status:200}));
+      fsState.files.set("/tmp/television-test-userdata/connection.json", JSON.stringify({
+        serverURL:"http://user:private-password@localhost:41449/path?token=private-query#private-fragment",token:"private-token",
+      }));
+      const main = await loadAppModule(); await new main.App().start();
+      expect(item("Server: http://localhost:41449").enabled).toBe(false);
+      expect(item("Disconnect from Server").enabled).toBe(true);
+      expect(JSON.stringify(tray().menu)).not.toMatch(/private-|user:/);
+      await item("Hide Television").click!();
+      await item("Disconnect from Server").click!();
+      expect(fsState.files.has("/tmp/television-test-userdata/connection.json")).toBe(false);
+      expect(item("Disconnect from Server").enabled).toBe(false);
+      expect(item("No saved server").enabled).toBe(false);
+      expect(mockState.MockBrowserWindow.instances[0].show).toHaveBeenCalled();
+      const connect = mockState.ipcHandlers.get("television:connect")!;
+      const result = await connect(undefined,"http://localhost:41450/?token=second-private-token");
+      expect(result).toMatchObject({ok:true});
+      expect(item("Server: http://localhost:41450").enabled).toBe(false);
+      expect(item("Disconnect from Server").enabled).toBe(true);
+      expect(JSON.stringify(tray().menu)).not.toContain("second-private-token");
+    });
+
+    it("refuses tray actions on a destroyed window and preserves tray through cancelled quit", async () => {
+      const main = await loadAppModule(); await new main.App().start();
+      const owned = mockState.MockBrowserWindow.instances[0];
+      owned.isDestroyed.mockReturnValue(true);
+      await item("Hide Television").click!(); await item("Show Television").click!();
+      await item("Disconnect from Server").click!();
+      expect(owned.hide).not.toHaveBeenCalled(); expect(owned.show).not.toHaveBeenCalled();
+      expect(tray().destroyed).toBe(false);
+      mockState.appHandlers.get("quit")!();
+      expect(tray().destroyed).toBe(true);
+    });
+
+    it("retains the tray until the final quit after asynchronous compositor cleanup", async () => {
+      vi.stubEnv("XDG_CURRENT_DESKTOP","Hyprland"); vi.stubEnv("HYPRLAND_INSTANCE_SIGNATURE","fixture_123_456");
+      const main = await loadAppModule(); await new main.App().start();
+      let release!: () => void;
+      visibilityBoundary.entries[0].cleanup = () => new Promise<void>(resolve => {release=resolve;});
+      const event = {preventDefault:vi.fn()};
+      mockState.appHandlers.get("will-quit")!(event);
+      expect(event.preventDefault).toHaveBeenCalledOnce();
+      expect(tray().destroyed).toBe(false); expect(mockState.app.quit).not.toHaveBeenCalled();
+      release(); await vi.waitFor(()=>expect(mockState.app.quit).toHaveBeenCalledOnce());
+      expect(tray().destroyed).toBe(false);
+      mockState.appHandlers.get("quit")!(); expect(tray().destroyed).toBe(true);
+    });
+
+    it("leaves normal launch and menus usable when the tray is unavailable", async () => {
+      mockState.MockTray.failConstruction = true;
+      const warning = vi.spyOn(console,"warn").mockImplementation(()=>{});
+      try {
+        const main = await loadAppModule(); await expect(new main.App().start()).resolves.toBeUndefined();
+        expect(mockState.MockBrowserWindow.instances).toHaveLength(1);
+        expect(mockState.Menu.setApplicationMenu).toHaveBeenCalled();
+      } finally { warning.mockRestore(); }
+    });
+  });
 
   // proofs/arch/desktop/updates.md#^desktop-updates-t-start
   it("starts the update runtime once, with only its notification turned off, straight after naming the app", async () => {
@@ -524,7 +675,7 @@ describe("Electron main process", () => {
     afterEach(() => { Object.defineProperty(process, "platform", platform); });
 
     function hideItem() {
-      const template = mockState.Menu.buildFromTemplate.mock.calls.at(-1)![0] as Array<{
+      const template = mockState.Menu.setApplicationMenu.mock.calls.at(-1)![0] as Array<{
         label?: string; submenu?: Array<{ role?: string; label?: string;
           click?: (item: unknown, window: InstanceType<typeof mockState.MockBrowserWindow> | undefined) => void }>;
       }>;
@@ -973,14 +1124,15 @@ describe("Electron main process", () => {
     expect(loaded.searchParams.has("token")).toBe(false);
   });
 
-  it("shows the window once ready-to-show fires", async () => {
-    mockState.setAutoEmitReadyToShowOnLoad(true);
-
-    const main = await loadAppModule();
-    await new main.App().start();
-
-    const win = mockState.MockBrowserWindow.instances[0];
-    expect(win.show).toHaveBeenCalledTimes(1);
+  it("shows the Mac window once ready-to-show fires", async () => {
+    const platform=Object.getOwnPropertyDescriptor(process,"platform")!;
+    Object.defineProperty(process,"platform",{...platform,value:"darwin"});
+    try {
+      mockState.setAutoEmitReadyToShowOnLoad(true);
+      const main = await loadAppModule(); await new main.App().start();
+      const win = mockState.MockBrowserWindow.instances[0];
+      expect(win.show).toHaveBeenCalledTimes(1);
+    } finally { Object.defineProperty(process,"platform",platform); }
   });
 
   // Proof: [[arch/desktop/index.md#^desktop-t-about-version|About-panel version configuration]].

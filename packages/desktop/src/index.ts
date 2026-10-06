@@ -6,6 +6,7 @@ import {
   nativeTheme,
   Notification,
   shell,
+  Tray,
   type MenuItemConstructorOptions,
 } from "electron";
 import { classifyLinkTarget } from "@telepath-computer/television-artifact/link-target";
@@ -136,6 +137,7 @@ function restartToInstallUpdate(): void {
 
 export class App {
   private window: BrowserWindow | null = null;
+  private tray: Tray | null = null;
   private connection: Connection | null = null;
   private connectState: ConnectScreenState = { kind: "setup" };
   private attempt = 0;
@@ -218,6 +220,11 @@ export class App {
       if (this.isHyprland && this.window) this.revealWindow();
       else if (BrowserWindow.getAllWindows().length === 0) void this.createWindow();
     });
+    this.installTray();
+    app.on("quit", () => {
+      this.tray?.destroy();
+      this.tray = null;
+    });
     await this.createWindow();
   }
 
@@ -228,6 +235,58 @@ export class App {
     if (window.isMinimized()) window.restore();
     if (this.isHyprland) void this.visibility?.request(true);
     else { window.show(); window.focus(); }
+  }
+
+  private hideOwnedWindow(): void {
+    const window = this.window;
+    if (!window || window.isDestroyed()) return;
+    if (this.isHyprland) void this.visibility?.request(false);
+    else window.hide();
+  }
+
+  private installTray(): void {
+    if (process.platform !== "linux") return;
+    try {
+      this.tray = new Tray(path.join(__dirname, "..", "assets", "icon.png"));
+      this.tray.setToolTip("Television");
+      this.tray.on("click", () => this.revealWindow());
+      this.updateTrayMenu();
+    } catch {
+      this.tray?.destroy();
+      this.tray = null;
+      console.warn("Television's system tray is unavailable; the application launcher remains available.");
+    }
+  }
+
+  private updateTrayMenu(): void {
+    if (!this.tray) return;
+    let serverLabel = "No saved server";
+    if (this.connection) {
+      // Only an origin is presented, never a token, user information or link.
+      try {
+        const url = new URL(this.connection.serverURL);
+        serverLabel = url.protocol === "http:" || url.protocol === "https:"
+          ? `Server: ${url.origin}` : "Saved server";
+      } catch { serverLabel = "Saved server"; }
+    }
+    this.tray.setContextMenu(Menu.buildFromTemplate([
+      { label: "Show Television", click: () => this.revealWindow() },
+      { label: "Hide Television", click: () => this.hideOwnedWindow() },
+      { type: "separator" },
+      { label: serverLabel, enabled: false },
+      {
+        label: "Disconnect from Server",
+        enabled: this.connection !== null,
+        click: async () => {
+          if (!this.window || this.window.isDestroyed()) return;
+          await this.disconnect();
+          this.revealWindow();
+        },
+      },
+      { type: "separator" },
+      { label: "About Television", role: "about" },
+      { label: "Quit", role: "quit" },
+    ]));
   }
 
   private async createWindow(): Promise<void> {
@@ -282,8 +341,8 @@ export class App {
     });
     this.window.once("ready-to-show", () => {
       if (this.window !== window || window.isDestroyed()) return;
-      // Linux is visible from construction; compositor intent owns Hyprland afterwards.
-      if (!this.isHyprland) window.show();
+      // Linux is visible from construction; do not undo a later tray Hide.
+      if (process.platform !== "linux") window.show();
     });
     this.window.on("closed", () => {
       this.disposeVisibility(visibility);
@@ -517,6 +576,7 @@ export class App {
         : { role: "windowMenu" },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    this.updateTrayMenu();
   }
 }
 

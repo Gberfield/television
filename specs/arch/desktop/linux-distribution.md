@@ -56,3 +56,9 @@ interface HyprlandVisibilityController {
 ```
 
 `createHyprlandControl(options: { session: string }): HyprlandTransport` constructs the real local transport. `createHyprlandVisibility(options: { owner: WindowOwner; transport: HyprlandTransport; notify: (message: string) => void }): HyprlandVisibilityController` constructs the controller. Main-process code keeps the existing profile lock, connection/navigation state and native window lifetime; no renderer or installer interface changes. ^linux-hyprland-contract
+
+## Linux tray ownership
+
+Main creates and retains one Electron Tray after application readiness on Linux, using the bundled Television icon and a native context menu. Mac and Windows behavior stays unchanged. The menu is rebuilt when the saved connection changes; the displayed server is the HTTP(S) origin alone, excluding user information, path, query and fragment. Malformed stored addresses produce a generic saved-server label. No token or connection link is copied, logged or passed to an operating-system browser. ^linux-tray-ownership
+
+Show reuses the main process's owned-window reveal path. Tray Hide submits a hidden intent for that owned window without relying on the native menu's focused-window argument; the existing Window-menu focus guard is retained. Disconnect uses the existing connection-deletion path and then reveals setup. Callbacks refuse absent or destroyed owned windows. A tray construction failure is contained so the app and existing menus remain usable. Final quit destroys the tray after the existing compositor cleanup has completed; a cancelled quit does not discard the surviving tray. ^linux-tray-actions
