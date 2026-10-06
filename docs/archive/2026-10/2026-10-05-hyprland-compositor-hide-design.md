@@ -1,3 +1,5 @@
+> **Archived 2026-10 from branch fix/linux-window-menu.** This approved design informed the Linux specs and the implemented compositor-owned Hide adapter. It preserves the rationale for special-workspace movement and the rejected buffer-ownership engine alternative, which the final implementation diff does not reconstruct. The body below is unchanged from its working state and is a clue to the change, not a current status record.
+
 # Hyprland compositor-owned Hide design
 
 

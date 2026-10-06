@@ -1,3 +1,5 @@
+> **Archived 2026-10 from branch fix/linux-window-menu.** This four-task plan guided specification, controller/transport, main-process integration and bounded acceptance; the physical X11 supplement also required a temporary host-path repair outside the application. It preserves the coherent sequence of implementation slices, ownership decisions and acceptance boundaries that separate final diffs do not reconstruct. The body below is unchanged from its working state and is a clue to the change, not a current status record.
+
 # Hyprland compositor Hide implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for native execution, or superpowers:subagent-driven-development if the human selects that method. Steps use checkbox (`- [ ]`) syntax for tracking.
