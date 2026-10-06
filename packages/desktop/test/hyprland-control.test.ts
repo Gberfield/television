@@ -16,7 +16,7 @@ beforeEach(() => {
  root=mkdtempSync(path.join(tmpdir(),"tv-control-test-"));
  writeFileSync(path.join(root,"calls.jsonl"),"");
  writeFileSync(path.join(root,"hyprctl"),`#!${process.execPath}\nconst fs=require("node:fs"); const p=${JSON.stringify(root)};
- const args=process.argv.slice(2); fs.appendFileSync(p+"/calls.jsonl",JSON.stringify(args)+"\\n");
+ const args=process.argv.slice(2); fs.appendFileSync(p+"/calls.jsonl",JSON.stringify(args)+"\\n"); fs.appendFileSync(p+"/pids",process.pid+"\\n");
  const f=JSON.parse(fs.readFileSync(p+"/reply.json","utf8"));
  if(f.exit) process.exit(f.exit);
  if(f.hang) setInterval(()=>{},1000);
@@ -27,7 +27,7 @@ beforeEach(() => {
  reply({}); vi.stubEnv("PATH",root+path.delimiter+process.env.PATH);
  control=createHyprlandControl({session:owner.session});
 });
-afterEach(()=>{control.dispose();vi.unstubAllEnvs();rmSync(root,{recursive:true,force:true});});
+afterEach(async()=>{await control.dispose();vi.unstubAllEnvs();rmSync(root,{recursive:true,force:true});});
 describe("verified Hyprland control boundary",()=>{
  it("selects captured session with shell-free argv",async()=>{
   expect((await control.inspect(owner)).status).toBe("missing");
@@ -53,6 +53,15 @@ describe("verified Hyprland control boundary",()=>{
  it("kills timed out owned control child",async()=>{
   reply({hang:true});const start=Date.now();expect((await control.inspect(owner)).status).toBe("unavailable");
   expect(Date.now()-start).toBeGreaterThanOrEqual(1900);expect(Date.now()-start).toBeLessThan(4000);
+ });
+ it("disposal waits until a stalled owned cleanup child is dead",async()=>{
+  expect((await control.inspect(owner)).status).toBe("missing");reply({hang:true});
+  const completion=control.dispose();expect(completion).toBeInstanceOf(Promise);
+  let complete=false;Promise.resolve(completion).then(()=>{complete=true;});
+  await vi.waitFor(()=>expect(commands()).toHaveLength(4));expect(complete).toBe(false);
+  const pid=Number(readFileSync(path.join(root,"pids"),"utf8").trim().split("\n").at(-1));
+  process.kill(pid,0);await completion;
+  expect(()=>process.kill(pid,0)).toThrow();
  });
  it("disposed transport issues no new command",async()=>{
   control.dispose();expect((await control.inspect(owner)).status).toBe("unavailable");expect(commands()).toEqual([]);

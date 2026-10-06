@@ -8,6 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import { TelevisionClient } from "@telepath-computer/television-shared";
 import { startConnectTestServer } from "./connect-server.ts";
+import {observeHyprlandWindow} from "./linux-hyprland-observer.ts";
+import type {WindowOwner} from "../../src/hyprland-visibility.ts";
+import {randomUUID} from "node:crypto";
 import { disconnectFromServerMenu } from "./helpers.ts";
 import { DESKTOP_UPDATE_DOWNLOADED_CHANNEL, RESTART_TO_INSTALL_UPDATE_CHANNEL } from "../../src/desktop-update.ts";
 
@@ -224,18 +227,18 @@ test("packaged Linux preload translates upstream Mac gate markup and preserves L
 
 // proofs/product/linux-desktop.md#^linux-hyprland-hide-acceptance
 // proofs/arch/desktop/linux-distribution.md#^linux-hyprland-profile-acceptance
-// Actual entrypoint/profile lock and native visibility; Hyprland identity is
-// declared fixture data on private X11/Wayland compositors, not physical proof.
+// Real entrypoint/profile lock, server, document and generated control in actual private Hyprland.
+// Native captures/observations forfeit physical input, installed host backend and scaling.
 test("packaged Hyprland Hide restores its live connected window on a second launch", async () => {
-  const compositorDebug = process.env.TV_LINUX_WESTON_DEBUG;
-  const compositorDisplay = process.env.TV_LINUX_WESTON_DISPLAY;
-  test.skip(!compositorDebug || !compositorDisplay, "Hide acceptance requires an exclusive private Weston scene observer");
+  test.skip(process.env.TV_LINUX_HYPRLAND_FIXTURE!=="1"||!process.env.HYPRLAND_INSTANCE_SIGNATURE, "BLOCKED: Hide acceptance requires an owned actual Hyprland observer/session");
+  expect(evidenceDir, "BLOCKED: Hide acceptance requires an original compositor capture destination").toBeTruthy();
   const temporary = mkdtempSync(path.join(os.tmpdir(), "tv-hide-"));
   const config = path.join(temporary, "config");
   let server: Awaited<ReturnType<typeof startConnectTestServer>> | undefined;
   let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
   let independent: typeof app;
   let secondary: ReturnType<typeof spawn> | undefined;
+  let website: ReturnType<typeof createServer> | undefined;
   const waitForExit = async (child: ReturnType<typeof spawn>, timeout: number): Promise<boolean> => {
     if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return true;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -256,7 +259,14 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
     const { channel } = await client.channels.create({ name: "Hide continuity fixture" });
     const markdown = path.join(temporary, "retained.md");
     writeFileSync(markdown, "# Retained live document\n\nDeclared synthetic Hide/reopen acceptance content.\n");
-    await client.artifacts.create({ channelID: channel.id, kind: "path", title: "Retained live document", path: markdown });
+    const notes=await client.artifacts.create({ channelID: channel.id, kind: "path", title: "Retained live document", path: markdown });
+    const html=path.join(temporary,"retained.html");
+    writeFileSync(html,'<!doctype html><html><head><style>body{background:#f3f6fc;color:#172033;font:20px system-ui;padding:28px}input{display:block;margin-top:20px;width:95%;font:inherit;padding:12px}</style></head><body><h1>Persistent HTML fixture</h1><p>Declared synthetic unsaved document state.</p><label>Unsaved draft<input aria-label="Unsaved draft" value="Initial draft"></label></body></html>');
+    const overview=await client.artifacts.create({channelID:channel.id,kind:"path",title:"Persistent HTML fixture",path:html});
+    website=createServer((_request,response)=>{response.setHeader("Content-Type","text/html");response.end('<!doctype html><body style="background:white;color:#172033"><h1>Independent Hide URL fixture</h1><p>Declared independent loopback website.</p></body>');});
+    await new Promise<void>(resolve=>website!.listen(0,"127.0.0.1",resolve));
+    const address=website.address();if(!address||typeof address==="string")throw new Error("Website failed to bind");
+    const external=await client.artifacts.create({channelID:channel.id,kind:"url",title:"Independent Hide URL fixture",url:`http://127.0.0.1:${address.port}/`});
     await client.display.patch({ focusedChannelId: channel.id });
     const env = { ...process.env, XDG_CONFIG_HOME: config, XDG_CURRENT_DESKTOP: "Hyprland", DO_NOT_TRACK: "1" } as Record<string, string>;
     delete env.TV_TEST_MODE;
@@ -290,28 +300,43 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
     });
     const before = await state();
     expect(before.visible).toBe(true);
-    const mapped = (stage: string) => {
-      const scene = execFileSync(compositorDebug!, ["scene-graph"], {
-        env: { ...process.env, WAYLAND_DISPLAY: compositorDisplay! }, encoding: "utf8", timeout: 5_000,
-      });
-      if (evidenceDir) { mkdirSync(evidenceDir, { recursive: true }); writeFileSync(path.join(evidenceDir, `hide-${before.ozone}-${stage}-scene.txt`), scene); }
-      // Weston records mapped views, not merely registered surfaces. Native
-      // Wayland identifies the exact Electron PID/app ID. Xwayland supplies its
-      // own PID, so its attribution uses the sole Television title fixture on
-      // this exclusive display plus stable original Electron/native identity.
-      // No independent Television profile starts until this interval finishes.
-      const views = scene.split("\n").filter(line => line.includes("View ") && line.includes("top-level window 'Television'"));
-      expect(views.length).toBeLessThanOrEqual(1);
-      if (before.ozone === "wayland") {
-        return views.some(line => line.includes(`role xdg_toplevel, PID ${before.mainPID},`) && line.includes("of computer.telepath.television"));
-      }
-      expect(before.ozone).toBe("x11");
-      return views.some(line => line.includes("role xwayland,"));
+    let owner:WindowOwner={pid:before.mainPID,applicationID:"computer.telepath.television",
+      session:env.HYPRLAND_INSTANCE_SIGNATURE,marker:randomUUID()};
+    await expect.poll(async()=> (await observeHyprlandWindow(owner)).status).toBe("owned");
+    const origin=await observeHyprlandWindow(owner);if(origin.status!=="owned")throw new Error("Native origin unavailable");owner=origin.owner;
+    const observations:Array<{stage:string;observation:Awaited<ReturnType<typeof observeHyprlandWindow>>}>=[];
+    const expectMapping=async(visible:boolean,stage:string)=>{
+      await expect.poll(async()=>{const observed=await observeHyprlandWindow(owner);
+        return observed.status==="owned" ? {visible:observed.visibleOnMonitors.length>0,workspace:visible?observed.workspace:null} : observed;
+      },{timeout:10000,intervals:[100,200,400],message:`Original owned window output visibility=${visible} (${stage})`})
+        .toEqual({visible,workspace:visible?origin.workspace:null});
+      const observation=await observeHyprlandWindow(owner);expect(observation.status).toBe("owned");
+      observations.push({stage,observation});
+      if(evidenceDir){mkdirSync(evidenceDir,{recursive:true});writeFileSync(path.join(evidenceDir,`hide-${before.ozone}-${stage}-native.json`),JSON.stringify(observation,null,2)+"\n");}
     };
-    const expectMapping = (visible: boolean, stage: string) => expect.poll(() => mapped(stage), {
-      timeout: 10_000, intervals: [200, 400, 800], message: `Original native window mapped=${visible} (${stage})`,
-    }).toBe(visible);
+    const capture=(stage:string)=>{
+      if(evidenceDir){mkdirSync(evidenceDir,{recursive:true});execFileSync("grim",[path.join(evidenceDir,`hide-${before.ozone}-${stage}-compositor.png`)],{timeout:5000});}
+    };
     await expectMapping(true, "before");
+    await client.display.focus({artifactID:external.artifact.id});
+    await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Independent Hide URL fixture")]));
+    await client.display.focus({artifactID:notes.artifact.id});
+    await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Declared synthetic Hide/reopen")]));
+    await client.display.focus({artifactID:overview.artifact.id});
+    await expect.poll(guestText).toEqual(expect.arrayContaining([expect.stringContaining("Persistent HTML fixture")]));
+    const htmlGuestID=await primary.evaluate(async({webContents})=>{
+      for(const guest of webContents.getAllWebContents().filter(w=>w.getType()==="webview"))
+        if((await guest.executeJavaScript("document.body.innerText")).includes("Persistent HTML fixture"))return guest.id;
+      throw new Error("HTML guest absent");
+    });
+    await primary.evaluate(({webContents},id)=>webContents.fromId(id)!.executeJavaScript('window.artifactContinuitySentinel="retained-artifact-lifetime"; document.querySelector("input").value="Synthetic unsaved draft"'),htmlGuestID);
+    const artifactState=()=>primary.evaluate(({webContents},id)=>webContents.fromId(id)!.executeJavaScript('({sentinel:window.artifactContinuitySentinel,draft:document.querySelector("input").value})'),htmlGuestID);
+    // Capture after artifact focus movement settles, so the draft is not clipped mid-transition.
+    await expect.poll(()=>page.evaluate(id=>{
+      const guest=document.querySelector(`webview[src*="${id}"]`);
+      if(!guest)return false;const bounds=guest.getBoundingClientRect();
+      return bounds.width>0&&bounds.left>=0&&bounds.right<=innerWidth;
+    },overview.artifact.id)).toBe(true);
     await page.evaluate(() => { Object.assign(window, { hideContinuitySentinel: "retained-document-lifetime" }); });
     let navigations = 0;
     page.on("framenavigated", frame => { if (frame === page.mainFrame()) navigations++; });
@@ -323,6 +348,7 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
       const actual = { seccomp: /^Seccomp:\s+(\d+)$/m.exec(status)?.[1], noNewPrivileges: /^NoNewPrivs:\s+(\d+)$/m.exec(status)?.[1] };
       expect(actual).toEqual({ seccomp: "2", noNewPrivileges: "1" }); return actual;
     };
+    capture("before");
     const sandboxBefore = sandboxStatus(before);
     const cycles: Array<{ cycle: number; hidden: typeof before; after: typeof before; sandboxAfter: ReturnType<typeof sandboxStatus> }> = [];
     for (let cycle = 1; cycle <= 5; cycle++) {
@@ -330,9 +356,11 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
         const item = Menu.getApplicationMenu()!.items.find(item => item.label === "Window")!.submenu!.items.find(item => item.label === "Hide")!;
         item.click(undefined, BrowserWindow.getAllWindows()[0], undefined);
       });
-      await expect.poll(state).toMatchObject({ ...before, visible: false });
+      // Compositor Hide keeps Electron mapped/visible and its document alive.
+      await expect.poll(state).toEqual(before);
       await expectMapping(false, `cycle-${cycle}-hidden`);
       const hidden = await state();
+      capture(`cycle-${cycle}-hidden`);
       const update = `Update received while hidden ${cycle}`;
       await client.channels.update({ channelID: channel.id, name: update });
       // Actual entrypoint and profile lock; no injected instance event.
@@ -356,8 +384,7 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
       });
       await page.waitForFunction(() => (window as typeof window & { hideRepaintObserved?: boolean }).hideRepaintObserved === true,
         undefined, { polling: 100, timeout: 10_000 });
-      // Final continuity belongs after real remapping/painting, not at the
-      // earlier logical show request where a delayed reload can still follow.
+      // Final continuity is checked after independent compositor placement and repaint.
       expect(await page.evaluate(() => (window as typeof window & { hideContinuitySentinel?: string }).hideContinuitySentinel)).toBe("retained-document-lifetime");
       expect(navigations).toBe(0);
       await expect(page.getByText(update, { exact: true }).first()).toBeVisible();
@@ -367,6 +394,8 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
       expect(sockets).toEqual(originalSockets);
       expect(originalSockets.every(socket => !socket.destroyed)).toBe(true);
       const after = await state(); expect(after).toEqual(before);
+      expect(await artifactState()).toEqual({sentinel:"retained-artifact-lifetime",draft:"Synthetic unsaved draft"});
+      capture(`cycle-${cycle}-restored`);
       cycles.push({ cycle, hidden, after, sandboxAfter: sandboxStatus(after) });
     }
     if (evidenceDir) await page.screenshot({ path: path.join(evidenceDir, `hide-${before.ozone}-restored.png`) });
@@ -376,8 +405,8 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
     expect(otherPID).not.toBe(before.mainPID); expect(await state()).toEqual(before);
     if (evidenceDir) writeFileSync(path.join(evidenceDir, `hide-${before.ozone}-acceptance.json`), JSON.stringify({
       packageLauncher, desktopIdentityFixture: "Hyprland", before, cycles,
-      compositorObserver: "Exclusive private Weston mapped scene views",
-      x11SceneAttribution: "Sole Television title fixture; stable Electron/native identity, not direct XID attribution",
+      compositorObserver: "Actual Hyprland clients/workspaces/all monitor inventories, exact PID/class/address",
+      owner,origin,observations,unsavedHTMLDraftRetained:true,
       secondaryExited: true, retainedDocumentSentinel: true, navigations,
       savedConnectionIdentical: true, liveEventSocketsRetained: true,
       updateWhileHiddenReceived: true, independentProfilePID: otherPID,
@@ -395,7 +424,10 @@ test("packaged Hyprland Hide restores its live connected window on a second laun
     } finally {
       await independent?.close().catch(() => {});
       await app?.close().catch(() => {});
-      try { await server?.dispose(); } finally { rmSync(temporary, { recursive: true, force: true }); }
+      try { await server?.dispose(); } finally {
+        try {if(website)await new Promise<void>(resolve=>website!.close(()=>resolve()));}
+        finally {rmSync(temporary, { recursive: true, force: true });}
+      }
     }
   }
 });

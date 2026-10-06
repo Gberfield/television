@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](2026-10-05-hyprland-compositor-hide-design.md). The human approved this design on October 5, 2026. Its conversion into governing product/architecture specs and independent spec/proof gates is Task 1; this plan does not silently replace them.
 
-**Status:** Human approved; native implementation in this chat with repository-required independent gates. Task 1 spec/proof derivation converged. No compositor implementation, passing replacement acceptance or release readiness is claimed. Starting tree: `78746c9eb4882a72529f4c0e89ad8c3704c88a72` on `fix/linux-window-menu`.
+**Status:** Human approved; native implementation in this chat with repository-required independent gates. Task 1 spec/proof derivation and Task 2 implementation converged. Task 3 corrected main integration has positive private native matrix evidence; its independent correction review is pending. Recovery breadth, physical acceptance and full verification remain open; no release readiness is claimed. Starting tree: `78746c9eb4882a72529f4c0e89ad8c3704c88a72` on `fix/linux-window-menu`.
 
 ## Global constraints
 
@@ -82,11 +82,11 @@ interface HyprlandTransport {
   inspect(owner: WindowOwner): Promise<CompositorObservation>;
   apply(intent: VisibilityIntent): Promise<{ acknowledged: boolean }>;
   watch(owner: WindowOwner, changed: () => void): () => void;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 interface HyprlandVisibilityController {
   request(visible: boolean): Promise<VisibilityOutcome>;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 ```
 
@@ -108,12 +108,12 @@ interface HyprlandVisibilityController {
 
 **Interfaces:** Consume Task 2 factories/interfaces and independent `observeHyprlandWindow` helper.
 
-- [ ] **Step 1: Write lifecycle failures.** Replace expectations that Hyprland calls `BrowserWindow.hide()` with requests to the owned controller. Assert no Electron Hide, no reload, unchanged window/document/connection; lock loser still exits before readiness/load; early launcher request wins once a real window exists; late ready-to-show cannot undo requested visibility; no focused/unrelated window causes no move; closed-window disposal cancels queued work. Non-Hyprland Minimize and Mac behavior stay covered.
-- [ ] **Step 2: Verify red.** `npm test -- local --file packages/desktop/test/main.test.ts --grep 'Hyprland'`. Confirm failures arise from the old wiring.
-- [ ] **Step 3: Wire the controller.** Preserve existing profile lock, `second-instance`, activation and connection code. Construct the owner for the one live main window after creation, bind to the verified compositor session, and delegate Hide/reveal. Native `Notification` supplies nonintrusive failure copy; unavailable notification support must not turn failure into success. A new process starts visibly; no previous-process adoption. Guard startup/ready/close callbacks against stale window/controller identity.
-- [ ] **Step 4: Add the independent packaged spine and verify red.** Actual Hyprland session, actual portable/AppRun entrypoint, profile lock and real token-protected Television server; labeled HTML, editable Markdown and independent loopback URL fixtures. Before Hide, set a document sentinel and make an unsaved edit. For five cycles: prove absence from every visible output, deliver server update while hidden, launch the same entrypoint/profile, prove original-workspace visibility, then verify same PID/native window/document, no navigation, edit/update/socket/profile continuity and production renderer sandbox. Capture original before/hidden/after images with independent compositor identity/state receipts. A missing actual Hyprland/X11 observer is BLOCKED, never accepted by Weston or renderer pictures.
-- [ ] **Step 5: Verify green and widen once.** Run the targeted main/connection files; desktop type-check; full desktop unit surface (`npm test -- local --surface unit:desktop`). Build with `npm run package:linux` into a separate output, use the provided installer in its own candidate prefix/XDG directories, and run the canonical packaged file against that package with `TV_LINUX_REQUIRE_SANDBOX=1`, `TV_LINUX_REQUIRE_WINDOW_MANAGER=1`, `--retries 0` on the prepared isolated Hyprland display. Explicit backend selection uses the existing launcher input; no harness sandbox opt-out is allowed. Preserve ordinary actual Wayland/X11 packaged cases with honest non-Hyprland identity on Weston.
-- [ ] **Step 6:** Independently converge this slice and commit locally. Record any required but unavailable native acceptance as an open gate, not a passing implementation.
+- [x] **Step 1: Write lifecycle failures.** Replace expectations that Hyprland calls `BrowserWindow.hide()` with requests to the owned controller. Assert no Electron Hide, no reload, unchanged window/document/connection; lock loser still exits before readiness/load; early launcher request wins once a real window exists; late ready-to-show cannot undo requested visibility; no focused/unrelated window causes no move; closed-window disposal cancels queued work. Non-Hyprland Minimize and Mac behavior stay covered.
+- [x] **Step 2: Verify red.** `npm test -- local --file packages/desktop/test/main.test.ts --grep 'Hyprland'`. Confirm failures arise from the old wiring.
+- [x] **Step 3: Wire the controller.** Preserve existing profile lock, `second-instance`, activation and connection code. Construct the owner for the one live main window after creation, bind to the verified compositor session, and delegate Hide/reveal. Native `Notification` supplies nonintrusive failure copy; unavailable notification support must not turn failure into success. A new process starts visibly; no previous-process adoption. Guard startup/ready/close callbacks against stale window/controller identity.
+- [x] **Step 4: Add the independent packaged spine and verify red.** Actual Hyprland session, actual portable/AppRun entrypoint, profile lock and real token-protected Television server; labeled HTML, editable Markdown and independent loopback URL fixtures. Before Hide, set a document sentinel and make an unsaved edit. For five cycles: prove absence from every visible output, deliver server update while hidden, launch the same entrypoint/profile, prove original-workspace visibility, then verify same PID/native window/document, no navigation, edit/update/socket/profile continuity and production renderer sandbox. Capture original before/hidden/after images with independent compositor identity/state receipts. A missing actual Hyprland/X11 observer is BLOCKED, never accepted by Weston or renderer pictures.
+- [x] **Step 5: Verify green and widen once.** Run the targeted main/connection files; desktop type-check; full desktop unit surface (`npm test -- local --surface unit:desktop`). Build with `npm run package:linux` into a separate output, use the provided installer in its own candidate prefix/XDG directories, and run the canonical packaged file against that package with `TV_LINUX_REQUIRE_SANDBOX=1`, `TV_LINUX_REQUIRE_WINDOW_MANAGER=1`, `--retries 0` on the prepared isolated Hyprland display. Explicit backend selection uses the existing launcher input; no harness sandbox opt-out is allowed. Preserve ordinary actual Wayland/X11 packaged cases with honest non-Hyprland identity on Weston.
+- [x] **Step 6:** Independently converge this slice and commit locally. Record any required but unavailable native acceptance as an open gate, not a passing implementation.
 
 ### Task 4: Real matrix, recovery breadth and integrated review
 

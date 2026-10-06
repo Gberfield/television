@@ -45,7 +45,7 @@ test("real Hyprland actions move only the owned window and reject delayed revisi
   expect(held.normalWorkspaces).toContain(held.activeNormalWorkspace);
   expect(await control.apply({...oldHide,revision:102,expectedExternalRevision:held.externalRevision,visible:true,originWorkspace:held.activeNormalWorkspace!})).toEqual({acknowledged:true});
   await expect.poll(async()=>{const o=await observeHyprlandWindow(owner);return o.status==="owned"?o.visibleOnMonitors.length:0;}).toBeGreaterThan(0);
- }finally{control.dispose();await app?.close().catch(()=>{});rmSync(temp,{recursive:true,force:true});}
+ }finally{await control.dispose();await app?.close().catch(()=>{});rmSync(temp,{recursive:true,force:true});}
 });
 
 
@@ -74,7 +74,7 @@ async function nativeFixture(run: (fixture: {app:Awaited<ReturnType<typeof elect
   const native=await observeHyprlandWindow(owner);if(native.status!=="owned")throw new Error("Fixture target unavailable");owner=native.owner;
   const records=(file:string)=>readFileSync(file,"utf8").trim().split("\n").filter(Boolean).map(s=>JSON.parse(s));
   await run({app,owner,control,manual:code=>execFileSync("/usr/bin/hyprctl",["-i",session,"repl",code],{encoding:"utf8",timeout:2000}).trim(),completed:()=>records(record),requested:()=>records(requested),withholdRegistration:()=>writeFileSync(withhold,"")});
- }finally{control.dispose();await app?.close().catch(()=>{});process.env.PATH=originalPATH;rmSync(temp,{recursive:true,force:true});}
+ }finally{await control.dispose();await app?.close().catch(()=>{});process.env.PATH=originalPATH;rmSync(temp,{recursive:true,force:true});}
 }
 test("refused newer restore fences an older unseen Hide without movement",async()=>{
  await nativeFixture(async({owner,control})=>{
@@ -114,7 +114,7 @@ test("real unique-client binding refuses ambiguity, wrong identity and closed re
    await app.evaluate(({BrowserWindow},id)=>{BrowserWindow.fromId(id)!.destroy();},primaryID);
    await expect.poll(async()=> (await control.inspect(owner)).status).toBe("replaced");
    expect(await control.apply({owner,revision:10,expectedExternalRevision:bound.externalRevision,visible:false,holdingWorkspace:"special:must-not-move-replacement"})).toEqual({acknowledged:false});
-  } finally {other.dispose();}
+  } finally {await other.dispose();}
  });
 });
 test("real fullscreen and grouped windows refuse Hide without movement",async()=>{

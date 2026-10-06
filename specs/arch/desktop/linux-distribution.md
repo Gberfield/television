@@ -28,7 +28,7 @@ Hide moves that window to its own inactive named special workspace without follo
 
 The controller records desired visibility before dispatch, serializes reconciliation and verifies actual workspace/output visibility before reporting an outcome. Repeated Hide preserves its origin. Early same-profile activation records a desired visible state fulfilled once the first window exists; late readiness must not undo Hide. A pending old operation cannot defeat a newer launcher request or a person's manual placement. Each minted action carries both an application request revision and the observed external-change revision; within the same compositor action, reject stale application revisions or a mismatched external revision before mutation. Manual movement/reveal increments the compositor's external revision, including when a higher application revision has not yet arrived. Do not refresh a stale action's external fence at execution. Own confirmed moves are distinguished from manual changes. Operating-system focus policy still governs attention. ^linux-hyprland-ordering
 
-Control uses shell-free `hyprctl` argument vectors against the captured session with a two-second command deadline and one-MiB output ceiling. Lua string data is encoded rather than interpolated as code. Visible-state observation is bounded by ten seconds; command exit or acknowledgement is insufficient for success. A timed-out child may already have issued a command, so ownership/intended action survive for reconciliation. Continuing control loss returns pending/failed restore, preserves the original window and emits the product's nonintrusive notification; later launcher activation retries without replacing the document or endless background retries. Disposal invalidates old callbacks/actions and releases only owned transient resources. ^linux-hyprland-control
+Control uses shell-free `hyprctl` argument vectors against the captured session with a two-second command deadline and one-MiB output ceiling. Lua string data is encoded rather than interpolated as code. Visible-state observation is bounded by ten seconds; command exit or acknowledgement is insufficient for success. A timed-out child may already have issued a command, so ownership/intended action survive for reconciliation. Continuing control loss returns pending/failed restore, preserves the original window and emits the product's nonintrusive notification; later launcher activation retries without replacing the document or endless background retries. Disposal immediately invalidates old callbacks/actions and returns completion for bounded release of owned transient resources. A cancelled quit must leave the surviving controller usable. Confirmed window closure starts disposal; final application quit waits for owned cleanup completion while command deadlines can still execute. Cleanup failure is not reported as confirmed observer removal. ^linux-hyprland-control
 
 The controller/transport contracts are:
 
@@ -47,11 +47,11 @@ interface HyprlandTransport {
   inspect(owner: WindowOwner): Promise<CompositorObservation>;
   apply(intent: VisibilityIntent): Promise<{ acknowledged: boolean }>;
   watch(owner: WindowOwner, changed: () => void): () => void;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 interface HyprlandVisibilityController {
   request(visible: boolean): Promise<VisibilityOutcome>;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 ```
 

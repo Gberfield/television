@@ -168,6 +168,8 @@ export function createHyprlandControl(options: {session:string}): HyprlandTransp
   const session=options.session;
   const env: NodeJS.ProcessEnv={...process.env,HYPRLAND_INSTANCE_SIGNATURE:session};
   let disposed=false;
+  let disposal:Promise<void>|undefined;
+  const pendingCommands=new Set<Promise<string>>();
   let verified:Promise<boolean>|undefined;
   const children=new Set<ChildProcess>();
   const sockets=new Set<Socket>();
@@ -175,7 +177,7 @@ export function createHyprlandControl(options: {session:string}): HyprlandTransp
   const validSession=/^[a-zA-Z0-9-]+_[0-9]+_[0-9]+$/.test(session);
   function command(args:string[], cleaning=false):Promise<string> {
     if ((!cleaning&&disposed)||!validSession) return Promise.reject(new Error("Compositor control unavailable"));
-    return new Promise((resolve,reject)=>{
+    const completion=new Promise<string>((resolve,reject)=>{
       const child=spawn("hyprctl",["-i",session,...args],{env,stdio:["ignore","pipe","pipe"],shell:false});
       children.add(child);
       let bytes=0;let stdout="";let failure:Error|undefined;
@@ -189,6 +191,9 @@ export function createHyprlandControl(options: {session:string}): HyprlandTransp
       child.once("error",error=>{failure=error;});
       child.once("close",code=>{clearTimeout(timer);children.delete(child);if(failure||code!==0)reject(failure??new Error("Compositor command failed"));else resolve(stdout.trim());});
     });
+    pendingCommands.add(completion);
+    void completion.then(()=>pendingCommands.delete(completion),()=>pendingCommands.delete(completion));
+    return completion;
   }
   async function verify():Promise<boolean> {
     if(disposed||!validSession)return false;
@@ -229,11 +234,17 @@ export function createHyprlandControl(options: {session:string}): HyprlandTransp
       return ()=>{socket.destroy();sockets.delete(socket);};
     },
     dispose(){
-      if(disposed)return;disposed=true;
+      if(disposed)return disposal;disposed=true;
       for(const socket of sockets)socket.destroy();sockets.clear();
+      const interrupted=[...pendingCommands];
       for(const child of children)child.kill("SIGKILL");
-      for(const owner of owners.values())void command(["repl",cleanup(owner)],true).catch(()=>{});
+      const cleanups=[...owners.values()].map(owner=>command(["repl",cleanup(owner)],true));
       owners.clear();
+      disposal=Promise.allSettled([...interrupted,...cleanups]).then(results=>{
+        if(results.slice(interrupted.length).some(result=>result.status==="rejected"))
+          console.warn("Television could not confirm compositor observer cleanup.");
+      });
+      return disposal;
     },
   };
 }

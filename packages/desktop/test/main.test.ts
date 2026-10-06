@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {CompositorObservation,VisibilityIntent,WindowOwner} from "../src/hyprland-visibility.ts";
 import {
   DESKTOP_UPDATE_DOWNLOADED_CHANNEL,
   GET_DESKTOP_UPDATE_CHANNEL,
@@ -45,7 +46,6 @@ type BeforeInputEventHandler = (
 ) => void;
 
 const mockState = vi.hoisted(() => {
-  const onceHandlers = new Map<string, () => void>();
   const appHandlers = new Map<string, (...args: unknown[]) => void>();
   const ipcHandlers = new Map<string, IpcHandler>();
   const ipcListeners = new Map<string, IpcListener>();
@@ -53,6 +53,7 @@ const mockState = vi.hoisted(() => {
   let loadFileBehavior: ((window: MockBrowserWindow) => Promise<void>) | undefined;
 
   class MockBrowserWindow {
+    private onceHandlers = new Map<string, () => void>();
     static instances: MockBrowserWindow[] = [];
     options: BrowserWindowOptions;
     loadURL = vi.fn(async (_url: string) => {
@@ -76,7 +77,7 @@ const mockState = vi.hoisted(() => {
     }
 
     once(event: string, handler: () => void): void {
-      onceHandlers.set(event, handler);
+      this.onceHandlers.set(event, handler);
     }
 
     private handlers = new Map<string, () => void>();
@@ -84,7 +85,7 @@ const mockState = vi.hoisted(() => {
     emit(event: string): void { this.handlers.get(event)?.(); }
 
     emitOnce(event: string): void {
-      const handler = onceHandlers.get(event);
+      const handler = this.onceHandlers.get(event);
       if (handler) handler();
     }
 
@@ -164,6 +165,37 @@ const mockState = vi.hoisted(() => {
 // runtime does to the product's update path (proofs/product/desktop-app.md).
 vi.mock("@todesktop/runtime", () => ({ default: mockState.runtime }));
 
+// External compositor/notification boundaries only. App and visibility controller stay real.
+// Native mutation and daemon presentation are forfeited to the packaged/physical spine.
+const visibilityBoundary=vi.hoisted(() => {
+  const entries:Array<{session:string;actions:VisibilityIntent[];disposed:boolean;
+    cleanup?:()=>Promise<void>;state?:CompositorObservation;inspect?:(owner:WindowOwner)=>Promise<CompositorObservation>}> = [];
+  const notifications:Array<{title:string;body:string}> = [];
+  let notificationSupported=true;
+  class Notification {
+    static isSupported() {return notificationSupported;}
+    constructor(private options:{title:string;body:string}) {}
+    show() {notifications.push(this.options);}
+  }
+  function owned(owner:WindowOwner):Extract<CompositorObservation,{status:"owned"}> {
+    return {status:"owned",owner:{...owner,address:"0xabc"},workspace:7,workspaceName:"7",visibleOnMonitors:[0],
+      existingWorkspaces:[7,9],normalWorkspaces:[7,9],activeNormalWorkspace:9,supportedWindowState:true,externalRevision:0};
+  }
+  return {entries,notifications,Notification,owned,setSupported:(value:boolean)=>{notificationSupported=value;},
+    create:({session}:{session:string}) => {
+      const entry:{session:string;actions:VisibilityIntent[];disposed:boolean;cleanup?:()=>Promise<void>;state?:CompositorObservation;
+        inspect?:(owner:WindowOwner)=>Promise<CompositorObservation>}={session,actions:[],disposed:false};entries.push(entry);
+      return {inspect:async(owner:WindowOwner)=>entry.inspect ? entry.inspect(owner) : entry.state??owned(owner),
+        apply:async(intent:VisibilityIntent)=>{
+          entry.actions.push(structuredClone(intent));
+          if(entry.disposed)return {acknowledged:false};
+          entry.state={...owned(intent.owner),workspace:intent.visible ? intent.originWorkspace! : -99,
+            workspaceName:intent.visible ? String(intent.originWorkspace) : intent.holdingWorkspace!,
+            visibleOnMonitors:intent.visible ? [0] : []};return {acknowledged:true};
+        },watch:()=>()=>{},dispose:()=>{entry.disposed=true;return entry.cleanup?.();}};
+    }};
+});
+vi.mock("../src/hyprland-control.ts",()=>({createHyprlandControl:visibilityBoundary.create}));
 vi.mock("electron", () => ({
   app: mockState.app,
   BrowserWindow: mockState.MockBrowserWindow,
@@ -171,6 +203,7 @@ vi.mock("electron", () => ({
   ipcMain: mockState.ipcMain,
   nativeTheme: mockState.nativeTheme,
   shell: mockState.shell,
+  Notification: visibilityBoundary.Notification,
 }));
 
 const fsState = vi.hoisted(() => {
@@ -214,12 +247,13 @@ describe("Electron main process", () => {
   };
 
   beforeEach(() => {
+    visibilityBoundary.entries.length=0;visibilityBoundary.notifications.length=0;visibilityBoundary.setSupported(true);
     vi.stubEnv("XDG_CURRENT_DESKTOP", "");
     mockState.app.requestSingleInstanceLock.mockReset().mockImplementation(() => {
       mockState.callOrder.push("app.requestSingleInstanceLock");
       return true;
     });
-    mockState.app.quit.mockClear();
+    mockState.app.quit.mockReset().mockImplementation(()=>{mockState.callOrder.push("app.quit");});
     mockState.MockBrowserWindow.instances.length = 0;
     mockState.appHandlers.clear();
     mockState.ipcHandlers.clear();
@@ -247,6 +281,7 @@ describe("Electron main process", () => {
   });
 
   afterEach(() => {
+    for(const window of mockState.MockBrowserWindow.instances) window.emit("closed");
     fsState.reset();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
@@ -483,6 +518,7 @@ describe("Electron main process", () => {
     beforeEach(() => {
       Object.defineProperty(process, "platform", { ...platform, value: "linux" });
       vi.stubEnv("XDG_CURRENT_DESKTOP", "Hyprland");
+      vi.stubEnv("HYPRLAND_INSTANCE_SIGNATURE", "fixture_123_456");
     });
     afterEach(() => { Object.defineProperty(process, "platform", platform); });
 
@@ -536,49 +572,96 @@ describe("Electron main process", () => {
     });
 
     // proofs/arch/desktop/linux-distribution.md#^linux-hyprland-reveal-contract
-    it("hides only the focused window and safely ignores missing focus", async () => {
-      const main = await loadAppModule(); await new main.App().start();
-      const primary = mockState.MockBrowserWindow.instances[0];
-      const focused = new mockState.MockBrowserWindow({});
-      expect(hideItem().label).toBe("Hide");
-      const hide = hideItem().click!;
-      expect(() => hide(undefined, undefined)).not.toThrow();
-      hide(undefined, focused);
-      expect(focused.hide).toHaveBeenCalledOnce();
-      expect(primary.hide).not.toHaveBeenCalled();
-      expect(mockState.app.quit).not.toHaveBeenCalled();
-      primary.emitOnce("ready-to-show");
-      expect(primary.show).toHaveBeenCalledOnce();
+    it("hides only its focused owned main window and ignores missing or unrelated focus", async () => {
+      const main=await loadAppModule();await new main.App().start();
+      const primary=mockState.MockBrowserWindow.instances[0],unrelated=new mockState.MockBrowserWindow({});
+      const hide=hideItem().click!;hide(undefined,undefined);hide(undefined,unrelated);
+      await Promise.resolve();expect(visibilityBoundary.entries[0].actions).toEqual([]);
+      expect(unrelated.hide).not.toHaveBeenCalled();hide(undefined,primary);
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].actions).toHaveLength(1));
+      expect(visibilityBoundary.entries[0].session).toBe("fixture_123_456");
+      expect(visibilityBoundary.entries[0].actions[0]).toMatchObject({visible:false,
+        owner:{pid:process.pid,applicationID:"computer.telepath.television",session:"fixture_123_456"}});
+      expect(primary.hide).not.toHaveBeenCalled();expect(mockState.app.quit).not.toHaveBeenCalled();
     });
-
-    it.each(["second-instance", "activate"])("%s reveals the same hidden window without reloading", async event => {
-      const main = await loadAppModule(); await new main.App().start();
-      const win = mockState.MockBrowserWindow.instances[0];
-      const loads = [win.loadFile.mock.calls.length, win.loadURL.mock.calls.length];
-      const saved = [...fsState.files];
-      expect(hideItem().click).toBeTypeOf("function");
-      hideItem().click!(undefined, win);
-      expect(win.hide).toHaveBeenCalledOnce();
-      win.emitOnce("ready-to-show");
-      expect(win.show).not.toHaveBeenCalled();
-      expect(mockState.appHandlers.has(event)).toBe(true);
+    it.each(["second-instance","activate"])("%s restores the same held window through compositor control without reloading",async event=>{
+      const main=await loadAppModule();await new main.App().start();
+      const win=mockState.MockBrowserWindow.instances[0],loads=[win.loadFile.mock.calls.length,win.loadURL.mock.calls.length],saved=[...fsState.files];
+      hideItem().click!(undefined,win);
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].state).toMatchObject({visibleOnMonitors:[]}));
+      win.emitOnce("ready-to-show");expect(win.show).not.toHaveBeenCalled();
       mockState.appHandlers.get(event)!();
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].state).toMatchObject({workspace:7,visibleOnMonitors:[0]}));
+      expect(visibilityBoundary.entries[0].actions.map(a=>a.visible)).toEqual([false,true]);
+      expect(mockState.MockBrowserWindow.instances).toEqual([win]);expect(win.hide).not.toHaveBeenCalled();
+      expect(win.show).not.toHaveBeenCalled();expect(win.focus).not.toHaveBeenCalled();
+      expect([win.loadFile.mock.calls.length,win.loadURL.mock.calls.length]).toEqual(loads);expect([...fsState.files]).toEqual(saved);
+    });
+    it("restores native minimized state before requesting compositor reveal",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      win.isMinimized.mockReturnValue(true);mockState.appHandlers.get("second-instance")!();
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].actions).toHaveLength(1));
+      expect(win.restore).toHaveBeenCalledOnce();expect(visibilityBoundary.entries[0].actions[0].visible).toBe(true);
+      expect(win.show).not.toHaveBeenCalled();expect(win.focus).not.toHaveBeenCalled();
+    });
+    it("failed control keeps the window and reports restore failure through native notification",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      const loads=[win.loadFile.mock.calls.length,win.loadURL.mock.calls.length];
+      visibilityBoundary.entries[0].state={status:"unavailable",reason:"control absent"};
+      mockState.appHandlers.get("second-instance")!();
+      await vi.waitFor(()=>expect(visibilityBoundary.notifications).toEqual([{title:"Television",body:expect.stringMatching(/still running.*restore.*retry/i)}]));
+      expect(visibilityBoundary.entries[0].actions).toEqual([]);expect(mockState.MockBrowserWindow.instances).toEqual([win]);
+      expect([win.loadFile.mock.calls.length,win.loadURL.mock.calls.length]).toEqual(loads);expect(win.hide).not.toHaveBeenCalled();
+    });
+    it("a cancelled quit leaves the surviving window able to Hide and reveal",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      // Electron emits before-quit before the renderer can refuse closure. No closed/will-quit follows cancellation.
+      mockState.appHandlers.get("before-quit")?.();
+      hideItem().click!(undefined,win);
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].state).toMatchObject({visibleOnMonitors:[]}));
+      mockState.appHandlers.get("second-instance")!();
+      await vi.waitFor(()=>expect(visibilityBoundary.entries[0].state).toMatchObject({workspace:7,visibleOnMonitors:[0]}));
       expect(mockState.MockBrowserWindow.instances).toEqual([win]);
-      expect(win.show).toHaveBeenCalledOnce();
-      expect(win.focus).toHaveBeenCalledOnce();
-      expect([win.loadFile.mock.calls.length, win.loadURL.mock.calls.length]).toEqual(loads);
-      expect([...fsState.files]).toEqual(saved);
+    });
+    it("final quit is deferred beyond the native will-quit callback's microtask checkpoint",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      win.emit("closed");await Promise.resolve();
+      // Electron resets its native quitting flag only after the JS will-quit callback and its microtasks return.
+      let nativeCallbackActive=true,acceptedQuits=0;
+      mockState.app.quit.mockImplementation(()=>{if(!nativeCallbackActive)++acceptedQuits;});
+      mockState.appHandlers.get("will-quit")?.({preventDefault:vi.fn()});
+      for(let i=0;i<8;i++)await Promise.resolve();
+      nativeCallbackActive=false;
+      await vi.waitFor(()=>expect(acceptedQuits).toBe(1));
+    });
+    it("final quit waits for the closed window's owned cleanup before exiting",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      let complete!:()=>void;visibilityBoundary.entries[0].cleanup=()=>new Promise<void>(resolve=>{complete=resolve;});
+      win.emit("closed");const preventDefault=vi.fn();
+      mockState.appHandlers.get("will-quit")?.({preventDefault});
+      expect(preventDefault).toHaveBeenCalledOnce();expect(mockState.app.quit).not.toHaveBeenCalled();
+      complete();await vi.waitFor(()=>expect(mockState.app.quit).toHaveBeenCalledOnce());
+      const finalPreventDefault=vi.fn();mockState.appHandlers.get("will-quit")?.({preventDefault:finalPreventDefault});
+      expect(finalPreventDefault).not.toHaveBeenCalled();
     });
 
-    it("restores native minimized state before showing and requesting focus", async () => {
-      const main = await loadAppModule(); await new main.App().start();
-      const win = mockState.MockBrowserWindow.instances[0];
-      win.isMinimized.mockReturnValue(true);
-      expect(mockState.appHandlers.has("second-instance")).toBe(true);
-      mockState.appHandlers.get("second-instance")!();
-      expect(win.restore).toHaveBeenCalledOnce();
-      expect(win.restore.mock.invocationCallOrder[0]).toBeLessThan(win.show.mock.invocationCallOrder[0]);
-      expect(win.show.mock.invocationCallOrder[0]).toBeLessThan(win.focus.mock.invocationCallOrder[0]);
+    it("closing its owned window invalidates an unfinished observation",async()=>{
+      const main=await loadAppModule();await new main.App().start();const win=mockState.MockBrowserWindow.instances[0];
+      let release!:(value:CompositorObservation)=>void;let captured:WindowOwner|undefined;
+      visibilityBoundary.entries[0].inspect=owner=>{captured=owner;return new Promise(resolve=>{release=resolve;});};
+      hideItem().click!(undefined,win);await vi.waitFor(()=>expect(captured).toBeDefined());win.emit("closed");
+      expect(visibilityBoundary.entries[0].disposed).toBe(true);release(visibilityBoundary.owned(captured!));
+      await new Promise(resolve=>setTimeout(resolve,0));expect(visibilityBoundary.entries[0].actions).toEqual([]);
+      expect(visibilityBoundary.notifications).toEqual([]);
+    });
+    it("stale closed and ready callbacks cannot clear or show a replacement window",async()=>{
+      const main=await loadAppModule();await new main.App().start();const old=mockState.MockBrowserWindow.instances[0];
+      old.emit("closed");mockState.MockBrowserWindow.instances.length=0;mockState.appHandlers.get("activate")!();
+      await vi.waitFor(()=>expect(mockState.MockBrowserWindow.instances).toHaveLength(1));
+      const replacement=mockState.MockBrowserWindow.instances[0];old.emit("closed");old.emitOnce("ready-to-show");
+      hideItem().click!(undefined,replacement);
+      await vi.waitFor(()=>expect(visibilityBoundary.entries.at(-1)!.actions).toHaveLength(1));
+      expect(replacement.show).not.toHaveBeenCalled();expect(visibilityBoundary.entries.at(-1)!.disposed).toBe(false);
     });
 
     it("keeps the initial window visible after a second launch during readiness", async () => {

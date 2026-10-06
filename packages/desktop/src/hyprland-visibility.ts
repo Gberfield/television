@@ -12,11 +12,11 @@ export interface HyprlandTransport {
   inspect(owner: WindowOwner): Promise<CompositorObservation>;
   apply(intent: VisibilityIntent): Promise<{ acknowledged: boolean }>;
   watch(owner: WindowOwner, changed: () => void): () => void;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 export interface HyprlandVisibilityController {
   request(visible: boolean): Promise<VisibilityOutcome>;
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 const OBSERVATION_DEADLINE_MS = 10_000;
 const POLL_MS = 100;
@@ -25,6 +25,7 @@ export function createHyprlandVisibility(options: { owner: WindowOwner; transpor
   notify: (message: string) => void }): HyprlandVisibilityController {
   let owner = { ...options.owner };
   let disposed = false;
+  let disposal: Promise<void> | undefined;
   let revision = 0;
   let serial: Promise<unknown> = Promise.resolve();
   let origin: number | undefined;
@@ -167,11 +168,13 @@ export function createHyprlandVisibility(options: { owner: WindowOwner; transpor
       }).finally(() => {--explicitRequests;});
     },
     dispose() {
-      if (disposed) return;
+      if (disposed) return disposal;
       disposed = true; ++revision;
       lifetime.abort();
-      unwatch(); options.transport.dispose();
+      unwatch();
+      disposal = Promise.resolve(options.transport.dispose());
       origin = undefined; holding = undefined;
+      return disposal;
     },
   };
 }
