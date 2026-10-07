@@ -55,8 +55,8 @@ for event in theme-set post-boot post-update; do
   paths+=("$HOME/.config/omarchy/hooks/$event.d/95-television-omarchy-theme")
 done
 for path in "${paths[@]:2}"; do
-  if [[ -e "$path" ]] && ! rg -q -F 'Managed by omarchy-television-theme' "$path"; then
-    if [[ "$adopt" == 1 && "$path" == */95-television-omarchy-theme ]] && rg -q -F '/omarchy/sync.py' "$path"; then
+  if [[ -e "$path" ]] && ! grep -qF 'Managed by omarchy-television-theme' "$path"; then
+    if [[ "$adopt" == 1 && "$path" == */95-television-omarchy-theme ]] && grep -qF '/omarchy/sync.py' "$path"; then
       continue
     fi
     echo "Refusing to overwrite an unowned file: $path" >&2

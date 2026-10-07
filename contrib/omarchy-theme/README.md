@@ -6,7 +6,7 @@ that hosts the Television server and uses Television's supported theme interface
 It is installed separately from the Linux desktop client; it is not a bundled
 default theme and does not change the desktop client's installer.
 
-Requirements: Omarchy, Python 3.11 or later, Bash, ripgrep, user systemd, and a
+Requirements: Omarchy, Python 3.11 or later, Bash, user systemd, and a
 working local `tv` command/server. No root privileges or new Python packages are
 needed.
 

@@ -195,6 +195,10 @@ class RepairTests(unittest.TestCase):
 
     def test_installer_preserves_cli_path_for_service_and_can_be_rerun(self):
         env = self.installer_env()
+        # Match Linux CI hosts that do not have the optional ripgrep tool.
+        rg = self.root / 'bin/rg'
+        rg.write_text('#!/bin/sh\nexit 127\n')
+        rg.chmod(0o755)
         for _ in range(2):
             result = subprocess.run(['bash', str(SOURCE.parent / 'install.sh')],
                                     env=env, capture_output=True, text=True)
