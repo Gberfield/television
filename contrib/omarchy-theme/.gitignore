@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+theme/theme.css
+theme/sync-state.json
+theme/.sync.lock
+theme/.omarchy-television-theme

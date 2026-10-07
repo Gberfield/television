@@ -1,0 +1,12 @@
+# Managed by omarchy-television-theme.
+[Unit]
+Description=Recover missed Omarchy Television theme synchronization
+
+[Timer]
+OnActiveSec=10s
+OnUnitInactiveSec=5min
+AccuracySec=15s
+Unit=omarchy-television-theme.service
+
+[Install]
+WantedBy=timers.target
