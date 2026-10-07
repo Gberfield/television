@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Managed by omarchy-television-theme. Queue the persistent repair service.
+set -euo pipefail
+export PATH="$HOME/.local/bin:$PATH"
+systemctl --user start --no-block omarchy-television-theme.service

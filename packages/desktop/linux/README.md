@@ -16,6 +16,12 @@ Use **File → Disconnect from Server** or **Ctrl+,** to change servers. The app
 
 ## Omarchy
 
+For a server running locally on Omarchy, the optional
+[Omarchy theme integration](../../../contrib/omarchy-theme/README.md) keeps
+Television's palette and light/dark appearance matched to the current desktop
+theme. Install it separately from the source checkout; the ordinary Linux client
+installer does not enable it.
+
 The launcher chooses native Wayland whenever `WAYLAND_DISPLAY` is present. Hyprland receives app identity `computer.telepath.television`. The desktop entry works with Omarchy's application launcher and ordinary Hyprland window bindings. An agent can set `TV_OZONE_PLATFORM=x11` for XWayland troubleshooting or pass `--ozone-platform=x11`; the launcher preserves explicit flags. No theme files, Hyprland bindings, system services or existing applications are changed by installation.
 
 The Linux **Window** menu provides **Maximize / Restore** and **Close**, plus **Hide** on Hyprland or native **Minimize** on other desktops. On verified Hyprland 0.56.2, Hide moves the focused owned main window into an inactive special workspace. It keeps the original window, current document, unsaved edits and server connection alive. Opening the same installation with the same profile restores that window to its original workspace and requests focus. Maximize / Restore toggles the focused native window and keeps its server connection.

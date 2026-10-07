@@ -1,0 +1,11 @@
+# Managed by omarchy-television-theme.
+[Unit]
+Description=Keep Television matched to the active Omarchy theme
+After=com.television.server.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/omarchy-television-theme/environment
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python %h/.local/share/omarchy-television-theme/theme/repair.py
+TimeoutStartSec=90
