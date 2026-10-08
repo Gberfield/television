@@ -1,8 +1,21 @@
 # Television desktop app
 
-`packages/desktop` holds the Television desktop app, an Electron client for a Television server. It renders URL artifacts as full embedded pages and gives Television a native application window. Users download it for Apple Silicon Macs from the link in the [administrator guide](../../docs/guides/television-admin-guide.md#desktop-client-recommended-for-url-artifacts), and the installed app updates itself.
+`packages/desktop` holds the Television desktop app, an Electron client for a Television server. It renders URL artifacts as full embedded pages and gives Television a native application window. Upstream distributes it for Apple Silicon Macs; this fork also packages an x86_64 Linux client for Omarchy/Arch, Wayland and X11. See the [administrator guide](../../docs/guides/television-admin-guide.md#desktop-app) for Mac setup and the [Linux guide](linux/README.md) for this fork's portable archive, AppImage, tray and installation.
 
-The workspace, `@telepath-computer/television-desktop`, is private, so npm never publishes it. ToDesktop builds, signs, notarizes and hosts the app from the bundle this workspace produces, and `@todesktop/runtime` updates installed apps from ToDesktop releases.
+The workspace, `@telepath-computer/television-desktop`, is private, so npm never publishes it. ToDesktop builds, signs, notarizes and hosts the Mac app, and `@todesktop/runtime` updates it. Linux packaging excludes that updater and uses electron-updater only for packaged AppImages with a configured HTTPS feed. Portable and Arch installations update through their installer or package source.
+
+## Linux and Omarchy
+
+`npm run package:linux` builds the Linux distribution on x86_64 Linux after the
+exact Electron runtime is installed. The [Linux guide](linux/README.md#build-and-verification)
+covers output paths and acceptance selectors. The [release history](../../docs/guides/linux-release-history.md)
+records published payloads; source workspace versions and Linux release versions
+are separate. The optional [Omarchy theme integration](../../contrib/omarchy-theme/README.md)
+is installed on the local server host, independently of client packaging.
+
+The ToDesktop build and Mac host checks below apply to the Mac distribution.
+Linux behavior and acceptance are owned by the [Linux desktop spec](../../specs/product/linux-desktop.md)
+and [distribution spec](../../specs/arch/desktop/linux-distribution.md).
 
 ## Development
 

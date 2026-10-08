@@ -1,71 +1,162 @@
 # Television for Linux
 
-This is a downstream Linux build of Television 1.4.23. It uses the same Electron app as the Mac version and bundles its runtime. Target: x86_64 Omarchy/Arch Linux with Hyprland/Wayland; X11 also works. The client connects to the Television server beside your agent, which may run on this machine or a remote one.
+This fork provides an x86_64 Linux desktop client targeting Omarchy/Arch Linux
+with Hyprland/Wayland, with X11 support. It bundles Electron and needs no Node or
+npm on the viewer's machine. The agent and Television server run together on a
+local or remote Linux/macOS machine; the client connects to that server.
 
-The [downstream fork's Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable) now provides 1.4.27: portable archive, AppImage and checksums. This is a fork release, not an official Telepath release. It fixes black default HTML/website text showing over a dark artifact card by disabling Electron guest background transparency; each page receives its native browser canvas while authored backgrounds and document color-scheme preferences remain intact. [The canvas proof](../../../proofs/ui/app/artifact-frame/index.md#^af-ui-ac-document-canvas) covers the regression. These canvas checks alone do not accept physical input, perceived GPU behavior or fractional scaling.
+The [fork Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable)
+publishes desktop **1.4.27** as a portable archive and AppImage, with
+`SHA256SUMS`, `latest-linux.yml`, and `build-info.json`. This is a downstream
+release. The repository workspace remains **1.4.23** even though newer upstream
+source has been integrated; building main does not reproduce the published
+1.4.27 payload automatically. The [fork overview](../../../docs/guides/fork-overview.md)
+explains the separate versions and recent changes.
 
-## Open or install
+## Install and connect
 
-For the portable archive, extract the whole archive in your file manager. Open **Install Television.desktop** (allow execution/trust in your file manager when prompted), then open **Television** from the application launcher. You can also open **television-launcher** in the extracted folder directly. The graphical installer needs no administrator privileges and preserves saved Television connections. Some file managers require enabling executable files before double-clicking them.
+For the portable archive, download `Television-1.4.27-linux-x64.tar.gz` and extract
+the complete folder. Open **Install Television.desktop**, allowing execution or
+trust when your file manager requests it. Then open **Television** from your
+application launcher. You can also run **television-launcher** directly from the
+extracted folder. To install from a terminal inside that folder:
 
-For the AppImage, mark it executable in file Properties and open it. A FUSE-compatible AppImage runtime is normally available on Omarchy; the portable archive is available when FUSE is unavailable. This app does not disable Chromium's sandbox. User-installed builds require an OS that permits unprivileged user namespaces; the Arch package installs the standard root-owned setuid sandbox instead.
+```bash
+bash ./install-television
+```
 
-Give your agent this prompt: “Install the Television server using https://television.run/install.md and give me its connect link. I already have the Linux desktop client.” Paste that one link into the app. Your agent needs access to the server's files; installing this client does not install an agent or copy cloud data to your laptop.
+The installer needs no administrator privileges. Its default locations are
+`$XDG_DATA_HOME/television`, `$XDG_DATA_HOME/applications/computer.telepath.television.desktop`,
+and `$XDG_DATA_HOME/icons/hicolor/512x512/apps/computer.telepath.television.png`,
+where `XDG_DATA_HOME` defaults to `~/.local/share`. `--prefix /absolute/path` selects
+a different dedicated client folder. Existing unrelated files are refused;
+saved connections in `$XDG_CONFIG_HOME/Television` (normally `~/.config/Television`)
+are preserved. Keep the whole archive together, including its assets and runtime.
 
-Use **File → Disconnect from Server** or **Ctrl+,** to change servers. The app reconnects to the saved server on launch. **File → About Television** shows its version. Channels, HTML/Markdown artifacts, embedded websites, tabs, themes, settings and Ctrl-based shortcuts use the shared Television implementation.
+For the AppImage, download `Television-1.4.27-linux-x86_64.AppImage`, make it
+executable in file Properties, and open it. It requires a compatible FUSE runtime;
+use the portable archive if FUSE is unavailable. Both user-installed formats use
+Chromium's production sandbox and require unprivileged user namespaces. The Arch
+package instead installs the root-owned setuid sandbox. Do not disable the sandbox
+to work around a launch problem.
 
-## Omarchy
+Ask your agent: “Install the Television server using https://television.run/install.md
+and give me its connect link. I already have the Linux desktop client.” Paste the
+complete link into the app. Installing the client does not install the server or
+an agent. Treat the link as a credential; do not add it to issues or shared docs.
 
-For a server running locally on Omarchy, the optional
-[Omarchy theme integration](../../../contrib/omarchy-theme/README.md) keeps
-Television's palette and light/dark appearance matched to the current desktop
-theme. Install it separately from the source checkout; the ordinary Linux client
-installer does not enable it.
+The app remembers its server. **File → Disconnect from Server** or **Ctrl+,**
+forgets that connection and lets you enter another. **File → About Television**
+shows the installed client version. Channels, HTML/Markdown artifacts, embedded
+websites, tabs, themes and settings use the shared implementation.
 
-The launcher chooses native Wayland whenever `WAYLAND_DISPLAY` is present. Hyprland receives app identity `computer.telepath.television`. The desktop entry works with Omarchy's application launcher and ordinary Hyprland window bindings. An agent can set `TV_OZONE_PLATFORM=x11` for XWayland troubleshooting or pass `--ozone-platform=x11`; the launcher preserves explicit flags. No theme files, Hyprland bindings, system services or existing applications are changed by installation.
+## Omarchy and window behavior
 
-The Linux **Window** menu provides **Maximize / Restore** and **Close**, plus **Hide** on Hyprland or native **Minimize** on other desktops. On verified Hyprland 0.56.2, Hide moves the focused owned main window into an inactive special workspace. It keeps the original window, current document, unsaved edits and server connection alive. Opening the same installation with the same profile restores that window to its original workspace and requests focus. Maximize / Restore toggles the focused native window and keeps its server connection.
+The launcher selects native Wayland when `WAYLAND_DISPLAY` is present, otherwise
+X11. `TV_OZONE_PLATFORM=x11` selects XWayland for diagnosis; an explicit
+`--ozone-platform=x11` argument takes precedence. The application identity is
+`computer.telepath.television`. Installation does not add Hyprland bindings,
+change desktop themes, or enable login startup.
 
-This replacement passes five private native Hide/reopen cycles on both Wayland and X11 through the installed portable launcher and extracted AppRun. It replaces the earlier Electron Hide path that failed native Wayland reopening; those historical failures remain recorded. The replacement was published in downstream 1.4.26 and is retained in 1.4.27. Guarded physical Wayland and X11 Hide, installed-entry restore and failure notification now pass on the current single display. The X11 walk followed a temporary repair of a missing host display pathname outside this application; its original blocked attempt remains recorded. This does not accept additional display configurations, automatic backend fallback or hand-pressed shortcuts. Full verification passes. That acceptance snapshot preserved the then-installed client.
+The **Window** menu provides **Maximize / Restore**, **Close**, and **Hide** on
+Hyprland (**Minimize** on other desktops). Verified Hyprland 0.56.2 support moves
+the focused owned window to an inactive special workspace. The same process,
+document, unsaved edits and server connection remain alive. Open the same
+installation with the same profile to restore that window to its original
+workspace and request focus. Unsupported compositor capabilities or
+fullscreen/grouped windows cause refusal with an explanation.
 
-Hide preserves normal, floating and maximized state. Fullscreen/grouped windows and unsupported compositor versions are refused with an explanation. If you manually move the window or reveal its holding workspace, your placement takes precedence. When the original workspace no longer exists, restore uses the verified active normal workspace. If control becomes unavailable, the window and connection remain alive; a notification explains the failure, and opening Television again retries restoration. Persistent control loss does not guarantee recovery. A new application process starts visibly and does not adopt an old hidden window.
+Manual movement or revealing the holding workspace takes precedence over the
+app's remembered placement. If the original workspace no longer exists, restore
+uses the verified active normal workspace. Failed compositor control leaves the
+window and connection alive and produces a notification; opening Television
+again retries. Continued control loss does not guarantee recovery. A new process
+starts visibly and does not adopt an old process's hidden window.
 
-Move the Linux window using its native titlebar or compositor bindings. Unlike the frameless Mac window, page content such as the sidebar/top-bar and modal strips does not drag the framed Linux window. Physical titlebar dragging and keyboard input need host acceptance independently of programmatic window operations.
+Move the framed Linux window with its native titlebar or compositor bindings.
+In-page sidebar, top-bar and modal strips do not drag it.
 
-## Linux system tray
+## System tray
 
-The 1.4.27 fork release adds a Television icon with **Show Television**, **Hide Television**, the saved server address, **Disconnect from Server**, **About Television** and **Quit**. Icon activation also restores the owned window. Hide preserves the document and connection; on Hyprland it uses the same guarded special-workspace placement as launcher recovery. Disconnect forgets the saved connection and reveals setup. The saved-server line contains no token and does not claim live connectivity.
+The tray offers **Show Television**, **Hide Television**, a saved-server address,
+**Disconnect from Server**, **About Television**, and **Quit**. Activating the icon
+restores the owned window. Tray Hide also works when another app has focus and
+retains document state; on Hyprland it uses the same guarded placement mechanism.
+The server address excludes the token and describes the saved connection, not
+live connectivity. Disconnect forgets it and reveals setup.
 
-Closing the native window still quits. The tray is available while Television runs, and it never stops the agent's server. On Omarchy, an unpinned tray item appears in the tray drawer; pin it from the tray's management menu to keep it visible. The installer does not enable login startup; on Omarchy it can be enabled separately with an opt-in post-boot hook that opens the normal desktop entry.
+Closing the native window or choosing Quit exits the client. Hide keeps it
+running. None of these stops the agent's server. On Omarchy an unpinned item
+appears in the tray drawer; pin it through the tray management menu. Login startup
+is a separate opt-in desktop configuration, not an installer default.
 
-## Updates
+## Follow the Omarchy theme
 
-A Linux build checks for AppImage updates only when its maintainer configures an HTTPS release feed. A configured URL alone does not establish that the feed is maintained or available. Replace a portable installation with a later build using its installer, or update an Arch installation through its package source. AppImage automatic download, verified payload and restart are implemented using electron-updater; a distribution maintainer enables that by building with `TV_LINUX_UPDATE_URL` pointing at an HTTPS Linux release feed and publishing future AppImages plus `latest-linux.yml`. The Mac ToDesktop feed is excluded from Linux packages. Saved data is Electron's existing Television profile (`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`).
+For a server hosted on Omarchy, install the optional
+[theme integration](../../../contrib/omarchy-theme/README.md) from this checkout:
 
-The previous 1.4.24 release in the fork's dedicated `linux-stable` HTTPS feed retained the versioned 1.4.23 bootstrap payloads for rollback. This downstream packaging release uses merged source `76892d7acc5d70074864d7d3c12ddf84ef6fdf3a`, with only the desktop package version and this guide's introduction stamped 1.4.24 in an isolated export; public `build-info.json` records those inputs. Production runtime bytes are unchanged. On October 4, 2026, actual FUSE 1.4.23 AppImages downloaded the hosted 1.4.24 payload and installed through the real **Restart to update** button. Both a custom stable filename and the normal versioned filename restarted and reconnected with their saved connection unchanged and production renderer sandbox enabled. This acceptance used private X11 displays and an independent headless Wayland compositor with software rendering, a real token-protected CLI server and declared synthetic Markdown. Both filename cases also restarted as native Wayland surfaces in the private compositor. These checks do not accept physical Omarchy input, perceived GPU behavior, fractional scaling, theme persistence or an ongoing feed-maintenance cadence. The [Linux distribution proof](../../../proofs/arch/desktop/linux-distribution.md#^linux-hosted-appimage-update) records the crossing.
+```bash
+bash contrib/omarchy-theme/install.sh
+```
 
-The feed now serves 1.4.25 from merged `caa6830da75e8e1c751613ddbece2226835c2ce2` (tree `fc3f6b992e24ffb571d4938e902d2137b0bc6be8`), with the desktop manifest and shipped guide stamped in an isolated export. The shared source/server version remains 1.4.23; this does not release npm or Mac packages. Both new payloads were verified through public HTTPS before feed metadata was replaced; 1.4.23 and 1.4.24 versioned payloads remain available. The bundled guide preserves its preparation snapshot; this source guide and release notes record publication. Four actual 1.4.24-to-1.4.25 updater crossings passed: stable and versioned filenames on private X11 and headless Wayland displays. Production download, the real **Restart to update** button, automatic replacement launch, authenticated reconnection, unchanged saved connection and renderer sandbox were checked. The normal installed client/server were not changed. These one-off software-display checks do not accept physical input, hardware GPU/fractional scaling, theme persistence or an ongoing maintenance cadence. The [distribution proof](../../../proofs/arch/desktop/linux-distribution.md#^linux-hosted-appimage-update) separates these outcomes from contract coverage.
+It follows the effective palette and light/dark appearance, including local
+palette overrides. A permanent repair copy, three Omarchy hooks and a five-minute
+user timer recover missed events and temporary server outages. Unchanged checks
+do not rewrite CSS or refresh the theme registry. This integration is separate
+from client installation and requires the local `tv` command/server. It affects
+that server's theme, not an unrelated remote server. The integration guide covers
+repair, ownership, backups and disabling automatic following.
 
-## Build and package (for agents/maintainers)
+## Updates and troubleshooting
 
-After publication on October 4, the provided portable installer upgraded the normal user installation from 1.4.23 to the exact publicly verified 1.4.25 payload. Two launches using the actual existing Television profile reconnected to the unchanged persistent server without link entry; the saved connection remained byte-identical. The main renderer and five artifact guests had seccomp 2 and no-new-privileges 1 without sandbox-disabling flags. The desktop entry and installed icon matched the release. This acceptance used an independent private Wayland/Pixman compositor; the client was closed afterward, desktop control remained stopped and the active workspace was unchanged. It supplements installation and saved-connection coverage, without accepting physical controls, launcher interaction, hardware GPU behavior or fractional scaling. The [distribution proof](../../../proofs/arch/desktop/linux-distribution.md#^linux-install-paths) records the scope.
+Portable installations update by running the newer archive's installer; Arch
+installations update through their package source. AppImage self-updates require
+a build-configured HTTPS feed and an actual packaged AppImage launch. The fork's
+published AppImages use its dedicated `linux-stable` feed. A downloaded update
+can be applied with **Restart to update**; server upgrades and upstream-tracking
+drafts do not upgrade the desktop client. Existing versioned release assets are
+retained for rollback. A configured feed does not guarantee future publication.
 
-Use Node 24 and npm >=11.5 <12. From the source root run `npm ci`, install Electron's exact runtime with `node node_modules/electron/install.js`, then `npm run package:linux`. `TV_LINUX_OUTPUT_DIR` selects the output folder. The build produces AppImage, portable tar.gz, hashes and an `arch/` folder. On Arch, an agent can run `makepkg -si` inside `arch/`; no AUR publication is claimed.
+If launch fails, run the extracted launcher or AppImage from a terminal and
+retain the error before changing anything. Check architecture, complete extraction,
+FUSE (AppImage), and user-namespace/sandbox support. For a connection problem,
+check the server with `tv status` on the agent's machine. A sandbox may block
+localhost even while the server is healthy; verify outside that sandbox before
+restarting it. `tv links` recovers the connect link, but its output is private.
+For a missing tray icon, inspect the Omarchy tray drawer first. For refused Hide,
+retain the notification and compositor version; unsupported versions do not fall
+back to Electron Hide.
 
-`TV_LINUX_REQUIRE_WINDOW_MANAGER=1` adds real menu maximize/restore checks to packaged acceptance when the private test display has a window manager. The harness activates the installed menu callback and checks native state, restored bounds and saved connection; it does not accept physical menu input or compositor shortcuts.
+## Build and verification
 
-The current Hyprland Hide packaged case requires an owned actual Hyprland session, `TV_LINUX_HYPRLAND_FIXTURE=1`, a package entrypoint and `TV_LINUX_EVIDENCE_DIR` for original compositor captures. The independent observer checks the exact PID/application identity/address and visibility on every output through five Hide/reopen cycles, then two-profile coexistence. Missing capabilities or captures do not accept Hide. Ordinary packaged acceptance on Weston remains separate and uses its honest non-Hyprland session identity; it cannot accept compositor Hide. These fixture selectors do not alter production.
+Build on x86_64 Linux with Node 24 and npm >=11.5 <12:
 
-The separate `test/e2e/linux-hyprland-startup.test.ts` passes a real launcher request while the locked original process is windowless, using an inspector scheduling pause. It requires one visible original process with real authenticated content and sandboxing; callback-before-window ordering remains a separate App contract.
+```bash
+npm ci
+node node_modules/electron/install.js
+npm run package:linux
+```
 
-Focused recovery cases in `test/e2e/linux-hyprland-recovery.test.ts` require the same actual session and package plus a private native notification service record. Declared delivery faults withhold or delay only owned control messages; movement, native state, the Electron document, server and notification protocol remain real. Private display checks forfeit physical input, notification presentation, installed host backend/GPU perception and scaling. The [owning proof](../../../proofs/product/linux-desktop.md#^linux-hyprland-hide-acceptance) distinguishes each acceptance grade.
+The default output is `packages/desktop/release`; `TV_LINUX_OUTPUT_DIR` overrides
+it. Packaging produces a portable archive, AppImage, checksums, build information
+and an `arch/` folder containing a generated PKGBUILD. `makepkg -si` in that folder
+builds/installs an Arch package; this is not an AUR publication. Maintainers set
+`TV_LINUX_UPDATE_URL` to an HTTPS feed when publishing update-enabled AppImages.
+The Linux bundle excludes the Mac ToDesktop updater. MIT, Electron/Chromium and
+third-party notices are included.
 
-Strict packaged host tests use `TV_LINUX_REQUIRE_SANDBOX=1` so the generic cloud test fallback cannot disable the sandbox. The acceptance record distinguishes native Wayland/X11, enabled-sandbox and AppImage launch checks from physical-input, GPU/fractional-scale and production-update checks. A browser walkthrough cannot execute the Linux binary. MIT license and Electron/Chromium notices are included.
+Use the [canonical test runner](../../../specs/arch/test-runner/test-runner.md).
+Strict packaged sandbox checks use `TV_LINUX_REQUIRE_SANDBOX=1`.
+`TV_LINUX_REQUIRE_WINDOW_MANAGER=1` adds menu maximize/restore checks when the test
+display has a window manager. Actual Hyprland acceptance requires
+`TV_LINUX_HYPRLAND_FIXTURE=1`, a package entrypoint and `TV_LINUX_EVIDENCE_DIR` for
+independent compositor captures; Weston checks do not accept Hyprland Hide.
+Startup and recovery cases live under `packages/desktop/test/e2e/`.
 
-## Published 1.4.27 tray release
-
-The dedicated [fork Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable) serves 1.4.27 from merged [tray PR #8](https://github.com/Gberfield/television/pull/8), source `43391068b7d90c933ace1042a03ca56e1f5b5f29` (tree `fa4879e2038998032da530b997e21c72241767fb`). Full ready-PR and merged-main CI passed. The tracked-files export stamps only the desktop manifest and bundled guide; the shared source/server version remains 1.4.23. All 635 application archive files match the accepted numeric tray candidate except the configured HTTPS feed literal. Public `build-info.json` records the source, pins and stamps.
-
-Portable and actual FUSE AppImage checks passed on independent Wayland and X11 displays with real token-protected servers, declared synthetic artifacts and the production renderer sandbox. Saved authentication, settings/theme selection, HTML/Markdown/URL artifacts and relaunch were checked. The final release also passed the real Quickshell/StatusNotifier/DBusMenu tray walk on each backend and entrypoint, including retained edits and live connection through Hide/Show, Disconnect/reconnect, About, Quit and native Close. These are protocol actions and assigned input, not hand-pressed physical input.
-
-Both immutable payloads were verified through anonymous public HTTPS before replacing the feed last; previous versioned payloads remain available. Four real hosted 1.4.26-to-1.4.27 updater crossings passed: stable and versioned filenames on private X11 and Weston/Pixman Wayland displays. The production Restart button replaced the exact payload and automatically reopened with an authenticated socket, byte-identical connection, confirmed server settings/theme and sandboxed renderers. The existing normal client, profile and server were preserved during these private checks. This does not add perceived hardware GPU, fractional scaling, additional display configurations, an ongoing maintenance cadence or complete recovery coverage; recovery remains future work. The [distribution proof](../../../proofs/arch/desktop/linux-distribution.md#published-1427-tray-crossing) records this scope.
+[Release history](../../../docs/guides/linux-release-history.md) preserves the
+published updater crossings and host results. The
+[Linux desktop proof](../../../proofs/product/linux-desktop.md) and
+[distribution proof](../../../proofs/arch/desktop/linux-distribution.md) distinguish
+contract, packaged, private-display and physical-host evidence. Software-display
+checks do not establish hardware GPU behavior, fractional scaling, additional
+monitor configurations or complete recovery coverage.

@@ -10,6 +10,12 @@ Requirements: Omarchy, Python 3.11 or later, Bash, user systemd, and a
 working local `tv` command/server. No root privileges or new Python packages are
 needed.
 
+Run it on the Omarchy machine hosting the server. A Linux client connected to a
+remote server does not make that server follow the viewer's desktop palette.
+Python must also be available as `python` to the installer; the installed repair
+launcher uses `/usr/bin/python` on Arch. The installer does not require ripgrep.
+See [the fork overview](../../docs/guides/fork-overview.md) for distribution scope.
+
 The service retains the installation shell's PATH so it can find mise-managed
 Node and `tv` installations. Only PATH is saved; account environment variables
 and credentials are not collected. Rerun the permanent installer if the CLI's
@@ -41,6 +47,19 @@ Manual repair and refresh:
 omarchy-television-theme
 ```
 
+Read-only health checks:
+
+```bash
+systemctl --user status omarchy-television-theme.timer omarchy-television-theme.service
+systemctl --user list-timers omarchy-television-theme.timer
+journalctl --user -u omarchy-television-theme.service -n 50 --no-pager
+```
+
+The service is a oneshot, so an inactive service after a successful run is normal;
+the enabled timer schedules future checks. A failed activation remains pending
+and is retried. Check `tv status` and the selected Television home before
+reinstalling. Logs and timer times use your system's local time zone.
+
 Reinstall the integration from its permanent copy:
 
 ```bash
@@ -53,6 +72,13 @@ files. `--adopt-existing` is only for the earlier version of this exact integrat
 it verifies that version's authoring record before taking ownership. It is not a
 general override. The repair tool recreates a missing theme folder and repairs
 damaged runtime files, while preserving someone else's replacement theme folder.
+
+The selected theme contains `sync-state.json` with the last palette source,
+appearance and pending activation. Ownership is recorded by
+`.omarchy-television-theme`. Keep the permanent repair copy and user hooks/units
+with your configuration backups; the original checkout is not needed for repair.
+The installed runtime's authoring README is also used to recognize the early
+integration during adoption, so preserve its identity preamble.
 
 To stop automatic following, disable the timer and remove the three hooks:
 
