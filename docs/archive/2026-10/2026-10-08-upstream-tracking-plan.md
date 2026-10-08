@@ -1,3 +1,5 @@
+> **Archived 2026-10 from branch activation/upstream-tracking.** This implementation plan guided PR #12; the catch-up and tracker were completed with independent-review corrections, followed by an additive ancestry repair after its squash merge. It retains the original approved scope, integration and validation sequence, and review-driven design rationale as one historical record.
+
 # Upstream tracking and catch-up
 
 Approved scope: daily and manual detection for Television main and Omarchy stable/relevant compatibility changes, draft PRs only. Preserve upstream ancestry, downstream Linux/Omarchy behavior, fork version 1.4.23 and separate linux-stable release identity. No deployment, installation, release, access change or live artifacts.

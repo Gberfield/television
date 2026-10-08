@@ -22,6 +22,6 @@
     "fork_workspace_version": "1.4.23",
     "linux_release_feed": "https://github.com/Gberfield/television/releases/download/linux-stable/",
     "omarchy_history": "never_merge",
-    "pr_creation_enabled": false
+    "pr_creation_enabled": true
   }
 }
