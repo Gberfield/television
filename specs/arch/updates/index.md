@@ -59,3 +59,5 @@ This domain's four events (*client autoreloaded*, *update toast shown*, *update 
 ## Testing
 
 The testing policy says to name coverage provided by other specs rather than duplicate it ([testing-policy.md#Tests are the validation mechanism](../testing-policy.md#Tests are the validation mechanism)). This spec's proof covers validation of plain `major.minor.patch` release versions and the two shared comparisons. It also covers whether workspace manifests match the root version, how the publish workflow chooses the version it publishes, its pause file, and the order in which workspaces are versioned, built, and published. The [version advertisement](./version-advertisement.md#Web bundle version) spec owns coverage of the built web stamp. [Product CLI](../../product/cli.md#Command model, help, version, and recovery text) owns coverage of the packaged `tv --version` and running-server `tv status` outcomes.
+
+The downstream [fork upstream tracker](upstream-tracking.md) owns upstream detection and compatibility drafts.

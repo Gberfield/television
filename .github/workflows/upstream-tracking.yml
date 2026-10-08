@@ -1,0 +1,57 @@
+name: Track upstream updates
+on:
+  schedule:
+    - cron: '37 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: upstream-tracking
+  cancel-in-progress: false
+jobs:
+  detect:
+    if: ${{ github.repository == 'Gberfield/television' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      television: ${{ steps.detect.outputs.television }}
+      omarchy: ${{ steps.detect.outputs.omarchy }}
+      write_enabled: ${{ steps.detect.outputs.write_enabled }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Read public upstream state
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/upstream-tracking.mjs detect
+  prepare:
+    needs: detect
+    if: ${{ github.repository == 'Gberfield/television' && github.ref == 'refs/heads/main' && needs.detect.outputs.write_enabled == 'true' && (needs.detect.outputs.television == 'true' || needs.detect.outputs.omarchy == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      max-parallel: 1
+      matrix:
+        track: [television, omarchy]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      # Runs only trusted main tooling; no npm install, test or candidate script.
+      - name: Prepare immutable draft or report conflicts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACK: ${{ matrix.track }}
+        run: node scripts/upstream-tracking.mjs prepare "$TRACK"

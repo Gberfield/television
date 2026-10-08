@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "fork": "Gberfield/television",
+  "television": {
+    "repository": "telepath-computer/television",
+    "branch": "main",
+    "observed_sha": "c7545d6770fa4f5741d611314e4710939e28ebb7",
+    "integrated_sha": "c7545d6770fa4f5741d611314e4710939e28ebb7",
+    "tested_sha": null
+  },
+  "omarchy": {
+    "repository": "basecamp/omarchy",
+    "default_branch": "quattro",
+    "stable_tag": "v4.0.4",
+    "stable_sha": "c668141e9c42b13c80c9ca4ea108e11708c5e8a5",
+    "baseline_sha": "902fd8aebd98b6eedaa58276886a2f9f2876755f",
+    "observed_sha": "902fd8aebd98b6eedaa58276886a2f9f2876755f",
+    "compatibility_reviewed_sha": null
+  },
+  "policy": {
+    "draft_only": true,
+    "fork_workspace_version": "1.4.23",
+    "linux_release_feed": "https://github.com/Gberfield/television/releases/download/linux-stable/",
+    "omarchy_history": "never_merge",
+    "pr_creation_enabled": false
+  }
+}
