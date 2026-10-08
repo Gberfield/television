@@ -16,17 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Tree-hash attestation decision (specs/arch/test-runner/attestation.md#skip-semantics-in-ci):
-  # cheap, no install, always runs. Expected negative outcomes (no ref,
-  # unreachable origin, disabled policy, malformed ref) complete successfully
-  # with skip=false; continue-on-error keeps even an unexpected crash
-  # non-gating. Outputs from a successful decide step SURVIVE a later step
-  # failing the job, and under job-level continue-on-error dependents read
-  # needs.attest-check.result as 'success' even when the job failed
-  # (measured: run 29558875144) — so skip authorization is bound to the
-  # `authorized` output, emitted only by the FINAL step, which a failure of
-  # any earlier step skips. A failed decision job therefore always runs
-  # full validation.
+  # Retain the shared CI topology, but force every heavy test to execute.
   attest-check:
     if: ${{ github.repository == 'Gberfield/television' }}
     runs-on: ubuntu-latest
@@ -583,8 +573,8 @@ jobs:
           retention-days: 30
 
   # Single required status check for the e2e matrix so branch protection can
-  # gate on one stable name regardless of shard count. Draft PRs make this
-  # check not applicable by skipping the job. On every non-draft event the
+  # gate on one stable name regardless of shard count. Sync drafts run it.
+  # On every push/manual event the
   # job runs even after an upstream failure, so missing, skipped, failed, or
   # cancelled dependencies cannot read as success here.
   # (specs/arch/test-runner/github-ci.md#build-once-fan-out, Join integrity).
@@ -595,7 +585,7 @@ jobs:
     steps:
       # Green requires the vibe-mode check plus successful build and shard jobs. An authorized
       # attestation reaches success through step-level no-ops, so concrete
-      # required contexts still emit. Drafts never enter this run path;
+      # required contexts still emit. Sync drafts enter this run path;
       # missing, skipped, failed, and cancelled dependencies all fail it.
       # (specs/arch/test-runner/attestation.md#skip-semantics-in-ci).
       - name: Require the build and all e2e shards to pass

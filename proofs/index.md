@@ -99,7 +99,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `desktop-upgrade-recommendation.md` (27 lines) — *How the desktop upgrade recommendation is proven: the production thresholds read directly, decision and presentation contracts, a real-browser rendering seam, and the product's real-Electron journeys for the apps installed from npm that it reaches.*
     - `index.md` (39 lines) — *How the update domain's shared rules are proven: version validation and comparison contracts, repository checks of workspace versions and the publish workflow, including eligibility, queueing and its pause file, and the release order left to maintainers.*
     - `update-channel.md` (50 lines) — *How the promises in Update channel are proven.*
-    - `upstream-tracking.md` (8 lines) — *Evidence for downstream upstream tracking.*
+    - `upstream-tracking.md` (29 lines) — *Synthetic Git and workflow contracts for downstream tracking, with hosted checks recorded separately.*
     - `version-advertisement.md` (40 lines) — *How the promises in Version advertisement and client auto-reload are proven.*
 - **ui/**
   - `index.md` (13 lines) — *How the promises in UI policy are proven.*

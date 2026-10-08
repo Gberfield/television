@@ -1,7 +1,8 @@
 // Trusted default-branch tooling. Never install or execute candidate code here.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 const FORK = 'Gberfield/television';
@@ -16,15 +17,27 @@ const validSHA = (value) => /^[a-f0-9]{40}$/.test(value);
 
 export const relevantOmarchyPath = (path) => /(^|\/)(themes?|hypr|hyprland|waybar|packages)(\/|\.)|^install\/|^bin\/omarchy-(theme|launch|update|hypr|restart)/i.test(path);
 export const branchAvailable = (ref) => ref === null;
+export const protectedIntegrationPath = (file) => /^\.github\/|^packages\/desktop\/(linux\/|build\.mjs$|scripts\/linux-build\.mjs$)|^specs\/arch\/updates\/update-channel\.json$/.test(file);
+export function syncBranch(track, source) {
+  const fingerprint = track === 'omarchy' ? `-${createHash('sha256').update(JSON.stringify([source.stable_sha, source.tag, source.default_branch])).digest('hex').slice(0, 12)}` : '';
+  return `sync/${track}-${source.sha}${fingerprint}`;
+}
 export function pendingUpdates(manifest, observed, pulls) {
   const pending = [];
   if (manifest.television.integrated_sha !== observed.television) pending.push('television');
-  if (manifest.omarchy.stable_tag !== observed.omarchy.tag || manifest.omarchy.default_branch !== observed.omarchy.default_branch || observed.omarchy.relevant.length) pending.push('omarchy');
+  if (manifest.omarchy.stable_tag !== observed.omarchy.tag || manifest.omarchy.stable_sha !== observed.omarchy.stable_sha || manifest.omarchy.default_branch !== observed.omarchy.default_branch || observed.omarchy.relevant.length) pending.push('omarchy');
   return pending.filter((track) => !pulls.some((pr) => pr.head.repo?.full_name === FORK && pr.head.ref.startsWith(`sync/${track}-`)));
 }
 
 export function preserveVersions(root, base) {
   const files = git(root, 'ls-files', '-z', '*package.json').split('\0').filter(Boolean);
+  const checkout = realpathSync(root);
+  // Validate every path before reading or writing any fetched manifest.
+  for (const file of [...files, 'package-lock.json']) {
+    const path = resolve(root, file);
+    if (!lstatSync(path).isFile() || !realpathSync(path).startsWith(`${checkout}${sep}`)) throw new Error('Manifest must be a regular file inside the checkout; symlinks require review');
+  }
+  const workspacePaths = new Set(files.map((file) => dirname(file) === '.' ? '' : dirname(file)));
   for (const file of files) {
     let old;
     try { old = JSON.parse(git(root, 'show', `${base}:${file}`)); } catch { continue; }
@@ -38,7 +51,7 @@ export function preserveVersions(root, base) {
   const oldLock = JSON.parse(git(root, 'show', `${base}:package-lock.json`));
   lock.version = oldLock.version;
   for (const [name, entry] of Object.entries(lock.packages)) {
-    if (!name.startsWith('node_modules/') && oldLock.packages[name]?.version) entry.version = oldLock.packages[name].version;
+    if (workspacePaths.has(name) && oldLock.packages[name]?.version) entry.version = oldLock.packages[name].version;
   }
   writeFileSync(resolve(root, 'package-lock.json'), `${JSON.stringify(lock, null, 2)}\n`);
 }
@@ -52,8 +65,9 @@ export function mergeCandidate(root, base, sourceSHA) {
     if (!conflicts.length) throw new Error('Merge failed without resolvable conflicts');
   }
   if (integrated) {
-    preserveVersions(root, base);
-    const protectedPaths = git(root, 'diff', '--name-only', base).trim().split('\n').filter((file) => /^\.github\/|^packages\/desktop\/linux\/|^specs\/arch\/updates\/update-channel\.json$/.test(file));
+    try { preserveVersions(root, base); }
+    catch { conflicts = ['review-required: invalid, nonregular or escaping manifest/lockfile']; integrated = false; }
+    const protectedPaths = git(root, 'diff', '--name-only', base).trim().split('\n').filter(protectedIntegrationPath);
     if (protectedPaths.length) { conflicts = protectedPaths.map((file) => `review-required: ${file}`); integrated = false; }
   }
   if (!integrated) git(root, 'reset', '--hard', base);
@@ -62,7 +76,7 @@ export function mergeCandidate(root, base, sourceSHA) {
 
 async function api(path, { method = 'GET', body, optional = false } = {}) {
   const response = await fetch(`https://api.github.com/${path}`, {
-    method, headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}) },
+    method, headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   if (optional && response.status === 404) return null;
@@ -113,7 +127,7 @@ async function main() {
   if (manifest.policy.pr_creation_enabled !== true) throw new Error('Automated PR creation is not enabled; owner capability approval required');
   if (!pending.includes(track)) return;
   const sourceSHA = track === 'television' ? observed.television : observed.omarchy.sha;
-  const branch = `sync/${track}-${sourceSHA}`;
+  const branch = syncBranch(track, track === 'television' ? { sha: sourceSHA } : observed.omarchy);
   const remoteRef = await api(`repos/${FORK}/git/ref/heads/${branch}`, { optional: true });
   if (!branchAvailable(remoteRef)) throw new Error('Existing sync branch preserved; owner intervention required');
   const base = git(root, 'rev-parse', 'HEAD').trim();

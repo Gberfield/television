@@ -74,7 +74,8 @@ describe("sync workflow trust boundaries", () => {
 });
 
 describe("synthetic ancestry and conflicts", () => {
-  it.each([false, true])("keeps ancestry for clean merges and reports conflicts (conflict=%s)", async (conflict) => {
+  it.each(["clean", "conflict", "symlink"])("keeps ancestry or reports unsafe integration (%s)", async (mode) => {
+    const conflict = mode === "conflict";
     const { mergeCandidate } = await load();
     const root = mkdtempSync(join(tmpdir(), "tv-merge-"));
     const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -86,13 +87,17 @@ describe("synthetic ancestry and conflicts", () => {
       writeFileSync(join(root, "content.txt"), "original\n"); git("add", "."); git("commit", "-qm", "base");
       git("checkout", "-qb", "upstream"); writeFileSync(join(root, "content.txt"), "upstream\n");
       writeFileSync(join(root, "package.json"), JSON.stringify({ version: "1.4.26" }));
+      if (mode === "symlink") {
+        rmSync(join(root, "package.json")); const { symlinkSync } = await import("node:fs"); symlinkSync("package-lock.json", join(root, "package.json"));
+      }
       git("add", "."); git("commit", "-qm", "upstream"); const upstream = git("rev-parse", "HEAD");
       git("checkout", "-qb", "downstream", "HEAD~1");
       writeFileSync(join(root, conflict ? "content.txt" : "linux.txt"), "downstream\n"); git("add", "."); git("commit", "-qm", "downstream"); const base = git("rev-parse", "HEAD");
       const result = mergeCandidate(root, base, upstream);
-      expect(result.integrated).toBe(!conflict);
-      expect(result.conflicts).toEqual(conflict ? ["content.txt"] : []);
-      if (conflict) { expect(git("rev-parse", "HEAD")).toBe(base); expect(readFileSync(join(root, "content.txt"), "utf8")).toBe("downstream\n"); }
+      expect(result.integrated).toBe(mode === "clean");
+      expect(result.conflicts).toEqual(conflict ? ["content.txt"] : mode === "symlink" ? ["review-required: invalid, nonregular or escaping manifest/lockfile"] : []);
+      if (mode === "symlink") { expect(git("rev-parse", "HEAD")).toBe(base); expect(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version).toBe("1.4.23"); }
+      else if (conflict) { expect(git("rev-parse", "HEAD")).toBe(base); expect(readFileSync(join(root, "content.txt"), "utf8")).toBe("downstream\n"); }
       else {
         git("add", "."); git("commit", "-qm", "merge");
         expect(git("show", "-s", "--format=%P")).toBe(`${base} ${upstream}`);
@@ -100,5 +105,46 @@ describe("synthetic ancestry and conflicts", () => {
         expect(readFileSync(join(root, "linux.txt"), "utf8")).toBe("downstream\n");
       }
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+describe("review regressions", () => {
+  it("uses stable release and branch identity in Omarchy proposal branches", async () => {
+    const { syncBranch } = await load();
+    const first = { sha, stable_sha: "b".repeat(40), tag: "v4.0.4", default_branch: "quattro" };
+    expect(syncBranch("omarchy", first)).not.toBe(syncBranch("omarchy", { ...first, tag: "v4.0.5" }));
+    expect(syncBranch("omarchy", first)).not.toBe(syncBranch("omarchy", { ...first, default_branch: "next" }));
+    expect(syncBranch("omarchy", first)).toBe(syncBranch("omarchy", first));
+  });
+  it("requires review for Linux build/feed selectors", async () => {
+    const { protectedIntegrationPath } = await load();
+    for (const file of ["packages/desktop/build.mjs", "packages/desktop/scripts/linux-build.mjs", "packages/desktop/linux/feed.json", ".github/workflows/publish.yml", "specs/arch/updates/update-channel.json"]) expect(protectedIntegrationPath(file)).toBe(true);
+    expect(protectedIntegrationPath("packages/view-markdown/src/editor.ts")).toBe(false);
+  });
+  it("retains updated nested dependency versions and refuses symlinked manifests", async () => {
+    const { preserveVersions } = await load();
+    const root = mkdtempSync(join(tmpdir(), "tv-dependency-"));
+    const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args]);
+    try {
+      execFileSync("git", ["init", "-q", root]); git("config", "user.name", "Synthetic"); git("config", "user.email", "synthetic@example.invalid");
+      writeFileSync(join(root, "package.json"), '{"version":"1.4.23"}');
+      const old = { version: "1.4.23", packages: { "": { version: "1.4.23" }, "packages/cli/node_modules/foo": { version: "1.0.0", resolved: "foo-1.0.0.tgz" } } };
+      writeFileSync(join(root, "package-lock.json"), JSON.stringify(old)); git("add", "."); git("commit", "-qm", "base");
+      const current = structuredClone(old); current.packages["packages/cli/node_modules/foo"] = { version: "2.0.0", resolved: "foo-2.0.0.tgz" };
+      writeFileSync(join(root, "package-lock.json"), JSON.stringify(current));
+      preserveVersions(root, "HEAD");
+      expect(JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")).packages["packages/cli/node_modules/foo"]).toEqual({ version: "2.0.0", resolved: "foo-2.0.0.tgz" });
+      rmSync(join(root, "package.json"));
+      const { symlinkSync } = await import("node:fs"); symlinkSync("package-lock.json", join(root, "package.json"));
+      expect(() => preserveVersions(root, "HEAD")).toThrow(/regular|symlink/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+
+describe("Omarchy stable commit identity", () => {
+  it("reports a stable tag moved to a different commit", async () => {
+    const { pendingUpdates } = await load();
+    expect(pendingUpdates({ television: { integrated_sha: sha }, omarchy: { stable_tag: "v4.0.4", stable_sha: sha, default_branch: "quattro" } }, { television: sha, omarchy: { sha, stable_sha: "b".repeat(40), tag: "v4.0.4", default_branch: "quattro", relevant: [] } }, [])).toEqual(["omarchy"]);
   });
 });
