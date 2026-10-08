@@ -12,7 +12,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
   - `desktop-app.md` (42 lines) — *How the downloaded desktop app's promises are proven: continuous real-Electron tests, and checks of an unreleased ToDesktop build, run by agents or by a person on a real Mac, before a change to the app's behavior reaches `main`.*
   - `keyboard-navigation.md` (32 lines) — *How the promises in Keyboard navigation are proven.*
   - `licensing.md` (30 lines) — *How Television's licensing promises are proven where users receive them: the license gate over the real tree, the packed CLI tarball, the desktop upload directory, the served browser notices, and Electron's license files in the installed desktop app.*
-  - `linux-desktop.md` (77 lines) — *Proves the Linux desktop port at its native process, script and packaged application boundaries.*
+  - `linux-desktop.md` (150 lines) — *Proves the Linux desktop port at its native process, script and packaged application boundaries.*
   - `tab-pages.md` (29 lines) — *How the promises in Tab pages are proven.*
   - `telemetry.md` (89 lines) — *How the promises in Telemetry are proven.*
   - `themes-and-appearance.md` (55 lines) — *How the promises in Themes and appearance are proven.*
@@ -46,7 +46,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `distribution.md` (34 lines) — *How the ToDesktop build's promises are proven: repository checks of the desktop workspace, its ToDesktop configuration, a generated upload directory, the build script's exit status and the real ToDesktop CLI's dry run, and the product's real-host checks for everything ToDesktop does.*
     - `e2e-harness.md` (21 lines) — *How the promises in Electron e2e harness are proven.*
     - `index.md` (28 lines) — *How the desktop architecture root's promises are proven: main-process identity contracts and a real-Electron data-location seam, composed with the module proofs and the product's real-host checks.*
-    - `linux-distribution.md` (73 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
+    - `linux-distribution.md` (151 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
     - `runtime.md` (21 lines) — *How the Electron runtime's promises are proven: exact-version declarations, runtime validity over authored package and runtime trees, and a real cold installation on a Node release known to truncate one.*
     - `updates.md` (28 lines) — *How desktop updates are proven: main-process and preload contracts with Electron and the update runtime replaced by recording mocks, the real Electron app with the runtime in its simulation mode, and the desktop product's update check, which presses the restart in a candidate build on a real Mac.*
   - **layout/**
@@ -99,6 +99,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `desktop-upgrade-recommendation.md` (27 lines) — *How the desktop upgrade recommendation is proven: the production thresholds read directly, decision and presentation contracts, a real-browser rendering seam, and the product's real-Electron journeys for the apps installed from npm that it reaches.*
     - `index.md` (39 lines) — *How the update domain's shared rules are proven: version validation and comparison contracts, repository checks of workspace versions and the publish workflow, including eligibility, queueing and its pause file, and the release order left to maintainers.*
     - `update-channel.md` (50 lines) — *How the promises in Update channel are proven.*
+    - `upstream-tracking.md` (8 lines) — *Evidence for downstream upstream tracking.*
     - `version-advertisement.md` (40 lines) — *How the promises in Version advertisement and client auto-reload are proven.*
 - **ui/**
   - `index.md` (13 lines) — *How the promises in UI policy are proven.*
