@@ -1,5 +1,10 @@
 # Television administration guide
 
+This copy belongs to the `Gberfield/television` downstream fork and includes its
+Linux/Omarchy client. The public `https://television.run/install.md` is published
+separately from upstream; updating this file does not deploy that public guide.
+Server installation from npm remains distinct from this fork's Linux releases.
+
 ## Purpose
 
 This guide is for an agent setting up and maintaining Television for a person. The person should have an easy time: few or no questions, no technical detail they didn't ask for, and a short final message that ends with what they need to connect. The agent handles everything technical and explains only when asked.
@@ -18,7 +23,7 @@ It has three parts:
 
 - **The server**, which runs persistently on the same machine as the agent.
 - **The `tv` command-line tool**, which the agent uses to install, check, and put content on the server. It only talks to a server on its own machine, which is why the agent and the server must be on the same machine.
-- **The viewer**, which is the person's web browser or the Television desktop app for Mac. The viewer can be on a different computer from the server and reaches it over the network.
+- **The viewer**, which is the person's web browser or the Television desktop app for Mac, or this fork's x86_64 Linux client. The viewer can be on a different computer from the server and reaches it over the network.
 
 There are two roles for this guide:
 
@@ -34,7 +39,7 @@ There are two roles for this guide:
 - Keep the final message short. When the person needs to connect, end it with what they need: the connect link, plus the ssh command if they reach this machine over an SSH tunnel. The link must be exact and verified (section 3).
 - Tell them only what they need to know or decide:
   - the telemetry notice, on first install;
-  - the desktop app recommendation, unless you know they already have the app. Say why it's worth having: it shows web pages inside Television, which a browser can't, and it gives Television its own window and Dock icon. If you know or suspect they use a Mac, recommend it directly; it is most likely eligible. Otherwise, mention that it's available in case they use a Mac. Don't ask about their computer just to decide this;
+  - the desktop app recommendation, unless you know they already have the app. Say why it's worth having: it shows web pages inside Television, which a browser can't, and it gives Television its own window and Dock icon. If you know or suspect they use a Mac, recommend it directly; it is most likely eligible. For a known Omarchy/x86_64 Linux viewer, recommend this fork's Linux client from section 4. Otherwise, mention the available desktop platforms without asking about their computer solely to decide this;
   - on a first install on a Mac, a heads-up that macOS will show a notification about a new background item;
   - anything that changes what they need to do to keep using Television;
   - anything that blocks the work and needs their decision, such as an outdated Node version.
@@ -68,7 +73,7 @@ The facts about Television that you need to install, upgrade, and look after it.
 
 #### Supported machines
 
-The agent and the Television server run on macOS or Linux. The viewer can be any computer with a browser, or a Mac with the desktop app (section 4).
+The agent and the Television server run on macOS or Linux. The viewer can be any computer with a browser, an eligible Mac with the upstream desktop app, or an x86_64 Linux desktop with this fork's client (section 4).
 
 #### Running in a sandbox
 
@@ -119,7 +124,7 @@ The server runs on this machine. The person views it from a browser or the deskt
 
 Gather evidence before asking. The useful sources:
 
-- **The request.** A person who says they are on the desktop app connect screen is on a Mac with the app open.
+- **The request.** A person who says they are on the desktop app connect screen already has a client; determine the operating system from available evidence rather than assuming a Mac.
 - **What you know about the person**, from memory or earlier conversation: which computers they use, how they usually reach this machine.
 - **This machine's operating system, and whether it has a desktop session.** A Mac or a Linux machine with a graphical session may be the computer the person sits at. A Linux server with no display, a VPS, or a container is not; the person views from somewhere else.
 - **Whether the desktop app is running here.** On a Mac, a running `Television` process (the app's process name) means the person is at this Mac with the app open.
@@ -205,13 +210,13 @@ The viewer runs on whatever computer the person uses to look at Television, whic
 
 #### Browser
 
-Any current browser opens Television from the connect link, on any computer that can reach the server. In a browser, Television can't display artifacts that are external web pages. In their place it shows a page saying the desktop app can show them, and telling the person to ask their agent to follow this guide to install it. A person who arrives that way wants the desktop app: if they view Television on an eligible Mac, give them the install steps below; otherwise, tell them the app is available only for Apple Silicon Macs and they can keep using the browser.
+Any current browser opens Television from the connect link, on any computer that can reach the server. In a browser, Television can't display artifacts that are external web pages. In their place it shows a page saying the desktop app can show them, and telling the person to ask their agent to follow this guide to install it. A person who arrives that way wants the desktop app: if they view Television on an eligible Mac, give them the install steps below; on x86_64 Linux, offer this fork's Linux release below; on other platforms, they can keep using the browser.
 
 #### Desktop app
 
 The Television desktop app is a native Mac app that shows Television in its own window, with its own Dock icon, and displays external web pages inside Television. It needs no Node or npm on the person's Mac, and it can't run on a machine without a display.
 
-**Eligible computers.** Apple Silicon Macs running macOS 12 or later. There is no desktop app for Intel Macs, Linux, or Windows; on those, the person uses a browser.
+**Eligible computers.** Apple Silicon Macs running macOS 12 or later. This fork additionally supports x86_64 Linux with a graphical session, targeting Omarchy/Arch with Hyprland/Wayland and retaining X11 compatibility. Intel Mac and Windows viewers use the browser.
 
 **Whether the person already has it.** A person who says they are on the desktop app connect screen has it. If they view Television on this Mac, `/Applications/Television.app` or a running `Television` process shows they have it. On another computer you can't check, so rely on what you know or what they tell you.
 
@@ -222,9 +227,60 @@ The Television desktop app is a native Mac app that shows Television in its own 
 3. Open Television from Applications, the Dock, or Spotlight.
 4. Paste the connect link into the app and press **Connect**.
 
-**Connecting and reconnecting.** On first launch the app shows a connect screen, which suggests a prompt for the person to give their agent and has a field for the connect link it gives back. The app checks the link with the server before saving it, and shows any problem, such as a wrong token, on that screen. Once connected, it remembers the connection and reconnects by itself each time it opens. To use a different link, for example after the server's address or token changes, the person chooses **Television › Disconnect from Server** and pastes the new link.
+**Connecting and reconnecting.** On first launch the app shows a connect screen, which suggests a prompt for the person to give their agent and has a field for the connect link it gives back. The app checks the link with the server before saving it, and shows any problem, such as a wrong token, on that screen. Once connected, it remembers the connection and reconnects by itself each time it opens. To use a different link, for example after the server's address or token changes, the person chooses **Disconnect from Server** from the **Television** menu on Mac or the **File** menu on Linux and pastes the new link.
 
 **Updates.** The app updates itself: it downloads new releases in the background and offers **Restart to update**. Restarting or upgrading the Television server never updates the app. If the server needs a newer app than the person has, the app shows a screen saying it needs an update, and offers the restart once the update has downloaded.
+
+#### Downstream Linux desktop
+
+Download this fork's portable archive or AppImage from
+`https://github.com/Gberfield/television/releases/tag/linux-stable`. As of October
+8, 2026, the published client is 1.4.27; the source workspace remains pinned to
+1.4.23. Use the selected release's checksums/build information when verifying a
+payload. These are downstream releases, not official Telepath Mac or npm releases.
+
+For the portable archive, extract the whole folder, open **Install
+Television.desktop** (allow execution/trust when prompted), then launch
+**Television**. The installer needs no administrator privileges and preserves
+saved connections. For AppImage, mark the file executable and open it; a compatible
+FUSE runtime is required. Use the portable archive if FUSE is unavailable. The
+client bundles Electron and requires no Node/npm, but its production sandbox
+requires unprivileged user namespaces for user-installed builds. Do not disable
+the sandbox as an installation workaround.
+
+Paste the same complete verified connect link into either Linux client. Use
+**File → Disconnect from Server** or **Ctrl+,** to enter another server;
+**File → About Television** shows the client version. The profile is
+`$XDG_CONFIG_HOME/Television`, normally `~/.config/Television`. The launcher chooses
+Wayland when available; explicit Ozone arguments or `TV_OZONE_PLATFORM` select
+another backend for diagnosis.
+
+On verified Hyprland, Hide retains the original window, document, unsaved edits
+and connection in an inactive special workspace. Launching the same installation
+with the same profile restores it. Unsupported compositor capabilities or window
+states are refused. The Linux tray provides Show/Hide, a token-free saved-server
+address, Disconnect, About and Quit. Closing the native window quits; hiding keeps
+it running. Tray actions do not stop the server. On Omarchy, check the tray drawer
+if the icon is not immediately visible. Client installation does not enable login
+startup or add desktop bindings.
+
+Portable clients update through the newer archive's installer; Arch clients
+update through their package source. Published fork AppImages use the dedicated
+HTTPS Linux feed and offer **Restart to update** after a verified download.
+Updating the server does not update the client, and source merges do not publish
+desktop payloads. Never use the Mac ToDesktop download to update a Linux client.
+
+For a local Omarchy server, an optional palette integration can be installed from
+a source checkout with `bash contrib/omarchy-theme/install.sh`. It requires
+Python 3.11+, Bash, user systemd, Omarchy and a working local `tv` command/server;
+it is not part of client installation. A permanent repair copy, theme-set/login/
+update hooks and a five-minute timer recover missed events and activation
+failures without restarting the desktop or server. Manual repair is
+`omarchy-television-theme`. Disable the timer and remove the owned hooks before
+selecting a different Television theme permanently. Full integration instructions
+are at `https://github.com/Gberfield/television/tree/main/contrib/omarchy-theme`.
+This follows the server host's palette; a client on Omarchy connected to a remote
+server does not make that remote server follow its local theme.
 
 ### 5. Telemetry
 
@@ -261,14 +317,14 @@ Before installing the service, record which agent harness is installing Televisi
 - **`tv serve --persist` says the server did not respond.** The service is installed, but its server isn't answering. The log usually names the cause, such as a `listen` address that isn't on this machine or a port another program is using. Fix the setting and rerun `tv serve --persist`. If the log shows the server running, check whether a sandbox is blocking `localhost` (section 1).
 - **`tv status` reports `healthy: false` soon after the computer starts or the person logs in.** The service takes a few seconds to start, and the service manager keeps restarting a server that can't start yet, for example while a Tailscale address isn't up. If `daemon.installed` is true, check again after about 15 seconds before troubleshooting.
 - **The server won't stay up after a network change.** A `listen` address that no longer exists on the machine stops the server from starting; the log names the address. Update `listen` and rerun `tv serve --persist` (section 2).
-- **The person sees "Access token required".** Their link's token doesn't match the server's. Check the server's token works locally; if it does, their link is stale or was corrupted. Give them their current link. In a browser, they open it; in the desktop app, they choose **Television › Disconnect from Server** and paste it.
+- **The person sees "Access token required".** Their link's token doesn't match the server's. Check the server's token works locally; if it does, their link is stale or was corrupted. Give them their current link. In a browser, they open it; in the desktop app, they choose **Disconnect from Server** from the **Television** menu on Mac or the **File** menu on Linux and paste it.
 - **The person can't reach the server from another computer.** Check that the address they use is in `bindAddresses`, that it is still this machine's address, and, for an SSH tunnel, that their tunnel is running and they're opening the `localhost` link. Then check what lies between: Tailscale connectivity, a firewall, or Docker port publishing.
 - **`tv` commands say the server isn't running, but the service is running.** If you run in a sandbox, it may be blocking HTTP requests to `localhost` (section 1, "Running in a sandbox").
-- **The desktop app shows "Can't connect with server".** The server can't be reached from the person's Mac. The app keeps retrying and reconnects by itself once the server is reachable.
+- **The desktop app shows "Can't connect with server".** The server can't be reached from the person's viewer computer. The app keeps retrying and reconnects by itself once the server is reachable.
 
 ### 7. Upgrades
 
-The Television server never upgrades itself; the person's agent upgrades it. The downloaded desktop app updates itself (section 4).
+The Television server never upgrades itself; the person's agent upgrades it. The Mac client and feed-enabled Linux AppImage update themselves; portable and Arch clients use their installer/package source (section 4).
 
 #### How people learn about an update
 
@@ -291,7 +347,7 @@ After the upgrade, open browser tabs reload themselves once when they reconnect;
 
 - **The home.** Releases before the Television home kept data in `~/.television`, or in a directory given with `--storage-path` or `TELEVISION_STORAGE_PATH`. That directory already has the home's layout. If it isn't `~/.television`, write its path into `~/.tv-home` so the reinstalled service and every `tv` command use it in place. `TELEVISION_PORT` and `TELEVISION_STORAGE_PATH` are now ignored; a warning appears while either is set.
 - **Settings from an older service.** Older releases took settings as command options, which the service definition still holds. A service from an older release keeps running after the package upgrade, and the first time it starts with no config file in its home, it writes its old options into one. If `tv config show` reports `configFileExists` as false, set `port` and `listen` from the old service definition yourself; if that definition has no `--auth` option, the service ran without a token, and the access token item below applies. Reinstalling then replaces the old definition. Releases from before the config file have no `tv config` commands, so on those, read the old service definition before upgrading the package and run `tv config show` after.
-- **The access token (rare).** A home from a much older release can have `auth` set to `false`. Television expects the token: set `auth` to `true` unless the person has explicitly asked to run without one. The person then needs a new link: tell them in the confirm message, and give it to them in the report. In a browser they open it; in the desktop app they choose **Television › Disconnect from Server** and paste it. If they then ask to go back to no token, set it back.
+- **The access token (rare).** A home from a much older release can have `auth` set to `false`. Television expects the token: set `auth` to `true` unless the person has explicitly asked to run without one. The person then needs a new link: tell them in the confirm message, and give it to them in the report. In a browser they open it; in the desktop app they choose **Disconnect from Server** from the **Television** menu on Mac or the **File** menu on Linux and paste it. If they then ask to go back to no token, set it back.
 - **Listen addresses.** If `listen` holds a Tailscale or LAN address, check it is still this machine's address (section 2). If the set of addresses changes, the person may lose a way of reaching Television; tell them.
 - **`installedByAgent`.** If it is unset, set it (section 5).
 
@@ -321,7 +377,7 @@ The new app opens with the saved server connection. If it shows the connect scre
 
 `tv stop` removes the service and stops the server that the service runs. A server started by hand with plain `tv serve` is not affected. It is not a pause: Television won't start again, at login or otherwise, until `tv serve --persist` runs again. It leaves the package, the skills, and the Television home in place, so reinstalling the service brings everything back as it was.
 
-To uninstall completely, also remove the npm package and the Television skills, the `television` and `tv-*` skills, from every skills directory where they were installed. If the person uses the desktop app, they remove it from their Mac themselves, like any Mac app.
+To uninstall completely, also remove the npm package and the Television skills, the `television` and `tv-*` skills, from every skills directory where they were installed. For Mac clients, remove the app like any Mac app. For a portable Linux user install, remove only the owned client prefix, desktop entry and icon; an Arch package is removed through its package manager and an AppImage by deleting that file. Keep the Electron profile unless the person explicitly requests deletion of saved connections. The optional Omarchy theme integration is separate: disable its timer and owned hooks before removing its files.
 
 Deleting the Television home, and `~/.tv-home` if it exists, permanently deletes the person's channels, artifacts, and token. Always get the person's explicit confirmation first, and say plainly that it can't be undone unless they have a backup.
 
@@ -390,7 +446,7 @@ If the person needs to connect to a working install, check whether the current `
 
 ### When the person wants the desktop app
 
-A person can arrive asking only for the desktop app, for example from the browser's page about external web pages (section 4). If Television is installed and they view it on an eligible Mac, give them the download link and steps, and their verified connect link to paste into the app. If their computer isn't eligible, say the app is available only for Apple Silicon Macs and they can keep using the browser.
+A person can arrive asking only for the desktop app, for example from the browser's page about external web pages (section 4). If Television is installed and they view it on an eligible Mac, give them the download link and steps, and their verified connect link to paste into the app. For an x86_64 Linux viewer, offer the downstream client and installation steps in section 4. Other computers can keep using the browser.
 
 ## Upgrade
 
@@ -432,7 +488,7 @@ No telemetry notice. Then wait for their go-ahead.
 One short message: Television is upgraded, and to which version. Add only what the person needs to act on:
 
 - the steps to move off the npm desktop app, if that applies (section 7);
-- in the rare case they need a new connect link (section 7), the link, complete and verified, with how to use it: open it in a browser, or in the desktop app choose **Television › Disconnect from Server** and paste it; and that they can get it again by asking you or running `tv links` on this machine.
+- in the rare case they need a new connect link (section 7), the link, complete and verified, with how to use it: open it in a browser, or in the desktop app choose **Disconnect from Server** from the **Television** menu on Mac or the **File** menu on Linux and paste it; and that they can get it again by asking you or running `tv links` on this machine.
 
 ## Read this guide in full
 
