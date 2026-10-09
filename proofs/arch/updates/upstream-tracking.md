@@ -31,5 +31,5 @@ For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tr
 ## Local discovery adapter
 
 - `scripts/upstream-tracking.mjs` exports GET-adapter discovery while retaining the guarded hosted writer.
-- `test/repo/upstream-discovery.node.test.mjs` verifies read-only observations, baseline preservation, adoption of an existing sync PR, and refusal of an incomplete paginated PR inventory.
-- This proof covers the read-only detector seam; it does not claim a merged upstream ancestry candidate or deployed Omarchy compatibility.
+- `test/repo/upstream-discovery.test.ts` verifies read-only observations, baseline preservation, adoption of an existing sync PR, and refusal of an incomplete paginated PR inventory.
+- These are injected-reader contract tests: the GET adapter is mocked. They prove discovery control flow and observation handling, and forfeit real GitHub transport, scheduler, permission and credential-boundary evidence. The production discovery hook is `discovery(manifest, read)`; full verification selects these contracts through the root Vitest suite. They do not claim a merged upstream ancestry candidate or deployed Omarchy compatibility.

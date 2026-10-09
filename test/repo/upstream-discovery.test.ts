@@ -1,11 +1,11 @@
-import {test} from 'node:test';
+import {test} from 'vitest';
 import assert from 'node:assert/strict';
 import * as tracker from '../../scripts/upstream-tracking.mjs';
 const sha='a'.repeat(40), other='b'.repeat(40);
 const manifest={television:{integrated_sha:other},omarchy:{baseline_sha:sha,stable_tag:'v4.0.4',stable_sha:sha,default_branch:'quattro'}};
 test('read-only discovery accepts an injected GET source and retains pending/dedupe semantics',async()=>{
- const calls=[];
- const read=async(path)=>{
+ const calls: string[]=[];
+ const read=async(path: string)=>{
   calls.push(path);
   if(path.includes('telepath-computer/television/commits/'))return {sha};
   if(path==='repos/basecamp/omarchy')return {default_branch:'quattro'};
@@ -20,11 +20,11 @@ test('read-only discovery accepts an injected GET source and retains pending/ded
  assert.equal(result.observed.television,sha);
  assert.equal(manifest.television.integrated_sha,other);
  assert.ok(calls.every(path=>path.startsWith('repos/')));
- const adopted=await tracker.discovery(manifest,async(path)=>path.includes('/pulls?')?[{head:{ref:'sync/television-existing',repo:{full_name:'Gberfield/television'}}}]:read(path));
+ const adopted=await tracker.discovery(manifest,async(path: string)=>path.includes('/pulls?')?[{head:{ref:'sync/television-existing',repo:{full_name:'Gberfield/television'}}}]:read(path));
  assert.deepEqual(adopted.pending,[]);
 });
 test('read-only discovery refuses an unbounded PR inventory',async()=>{
- const read=async(path)=>{
+ const read=async(path: string)=>{
   if(path.includes('telepath-computer/television/commits/'))return {sha};
   if(path==='repos/basecamp/omarchy')return {default_branch:'quattro'};
   if(path.endsWith('/releases/latest'))return {tag_name:'v4.0.4'};

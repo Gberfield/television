@@ -54,4 +54,4 @@ skills, restart the server or replace the installed desktop. See the
 
 The exported `discovery(manifest, read)` function supports a local coordinator through an injected GET-only GitHub adapter. Importing the module does not dispatch `main`, execute candidate tests, push branches, or create pull requests. Discovery preserves the existing pending-track and open-sync-PR deduplication rules and never advances integrated or compatibility baselines. Open PR discovery stops after ten pages of 100 results and fails explicitly when coverage is incomplete. The existing default-branch write guards still apply to the hosted `prepare` command.
 
-Run `node --test test/repo/upstream-discovery.node.test.mjs` for the dependency-free local discovery regressions.
+Run `npm test -- local --file test/repo/upstream-discovery.test.ts` for the injected-reader discovery contracts. They are also selected by the canonical root unit suite and full verification.
