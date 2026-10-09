@@ -27,3 +27,9 @@ For [ancestry and version preservation](../../../specs/arch/updates/upstream-tra
 ## Validation boundaries
 
 For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tracking-validation), “separates read-only discovery” and “validates draft sync branches” assert YAML permissions, draft triggers, actual tests, absent deploy secrets/write jobs and nonpersisted checkout credentials. The initial disabled PR-writing capability is explicitly documented; these assertions do not grant it. Actual full hosted checks must run at the final candidate SHA before acceptance. ^tracking-t-validation
+
+## Local discovery adapter
+
+- `scripts/upstream-tracking.mjs` exports GET-adapter discovery while retaining the guarded hosted writer.
+- `test/repo/upstream-discovery.node.test.mjs` verifies read-only observations, baseline preservation, adoption of an existing sync PR, and refusal of an incomplete paginated PR inventory.
+- This proof covers the read-only detector seam; it does not claim a merged upstream ancestry candidate or deployed Omarchy compatibility.
