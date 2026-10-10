@@ -5,3 +5,6 @@ export function preserveVersions(root: string, base: string): void;
 export function mergeCandidate(root: string, base: string, sourceSHA: string): { integrated: boolean; conflicts: string[] };
 export function syncBranch(track: string, source: { sha: string; stable_sha?: string; tag?: string; default_branch?: string }): string;
 export function protectedIntegrationPath(path: string): boolean;
+
+/** Read-only discovery. The injected adapter must perform GET requests only. */
+export function discovery(manifest: Parameters<typeof pendingUpdates>[0], read?: (path: string) => Promise<unknown>): Promise<{ observed: Parameters<typeof pendingUpdates>[1]; pending: string[] }>;
