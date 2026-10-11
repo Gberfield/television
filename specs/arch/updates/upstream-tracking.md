@@ -15,3 +15,9 @@ Sync validation runs the existing complete CI topology for sync-branch pushes an
 ## Testing
 
 Synthetic contract tests exercise integrated-versus-observed detection, Omarchy relevance/release/default-branch changes, deduplication and branch preservation, version/dependency preservation, merge ancestry and conflict reporting. Workflow contracts prove separate discovery/writing permissions and credential-free validation. Actual final-SHA hosted validation provides operational evidence; these contracts do not emulate GitHub's scheduler or permission checks.
+
+## Local read-only discovery
+
+The exported `discovery(manifest, read)` function supports a local coordinator through an injected GET-only GitHub adapter. Importing the module does not dispatch `main`, execute candidate tests, push branches, or create pull requests. Discovery preserves the existing pending-track and open-sync-PR deduplication rules and never advances integrated or compatibility baselines. Open PR discovery stops after ten pages of 100 results and fails explicitly when coverage is incomplete. The existing default-branch write guards still apply to the hosted `prepare` command.
+
+Run `npm test -- local --file test/repo/upstream-discovery.test.ts` for the injected-reader discovery contracts. They are also selected by the canonical root unit suite and full verification.

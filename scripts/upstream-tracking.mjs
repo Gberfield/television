@@ -83,22 +83,23 @@ async function api(path, { method = 'GET', body, optional = false } = {}) {
   if (!response.ok) throw new Error(`GitHub ${method} ${path}: ${response.status}`);
   return response.json();
 }
-async function pages(path) {
+async function pages(path, read = api) {
   const result = [];
-  for (let page = 1; ; page++) {
-    const rows = await api(`${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`);
+  for (let page = 1; page <= 10; page++) {
+    const rows = await read(`${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`);
     result.push(...rows);
     if (rows.length < 100) return result;
   }
+  throw new Error('Pull request pagination limit reached; discovery is incomplete');
 }
-async function discovery(manifest) {
+export async function discovery(manifest, read = api) {
   const [tv, repo, release, pulls] = await Promise.all([
-    api(`repos/${TV}/commits/main`), api(`repos/${OMARCHY}`), api(`repos/${OMARCHY}/releases/latest`), pages(`repos/${FORK}/pulls?state=open`),
+    read(`repos/${TV}/commits/main`), read(`repos/${OMARCHY}`), read(`repos/${OMARCHY}/releases/latest`), pages(`repos/${FORK}/pulls?state=open`, read),
   ]);
-  const [head, stable] = await Promise.all([api(`repos/${OMARCHY}/commits/${encodeURIComponent(repo.default_branch)}`), api(`repos/${OMARCHY}/commits/${encodeURIComponent(release.tag_name)}`)]);
+  const [head, stable] = await Promise.all([read(`repos/${OMARCHY}/commits/${encodeURIComponent(repo.default_branch)}`), read(`repos/${OMARCHY}/commits/${encodeURIComponent(release.tag_name)}`)]);
   let relevant = [];
   if (head.sha !== manifest.omarchy.baseline_sha) {
-    const comparison = await api(`repos/${OMARCHY}/compare/${manifest.omarchy.baseline_sha}...${head.sha}`);
+    const comparison = await read(`repos/${OMARCHY}/compare/${manifest.omarchy.baseline_sha}...${head.sha}`);
     // API file lists cap at 300. Divergence/truncation merits human review too.
     relevant = (comparison.files ?? []).filter((file) => relevantOmarchyPath(file.filename) || relevantOmarchyPath(file.previous_filename ?? '')).map((file) => file.filename);
     if (comparison.status === 'diverged' || comparison.status === 'behind' || comparison.files?.length >= 300) relevant.push('review-required: comparison incomplete or divergent');
