@@ -250,6 +250,12 @@ export class ArtifactView extends View<[ApplicationService, Artifact, ArtifactVi
         this.handleArtifactPointer(message);
         return;
       case "bridge-ready":
+        transport.send({
+          type: "external-link-policy",
+          openExternalWebLinks: this._artifact?.kind === "path",
+          sourceOrigin: window.location.origin,
+        });
+        return;
       case "leaving":
         // Lifecycle is owned by the channel.
         return;
@@ -682,6 +688,16 @@ export class ArtifactView extends View<[ApplicationService, Artifact, ArtifactVi
     const state = this._navigationState;
     if (!state || (!state.canGoBack && !state.canGoForward)) return null;
     return html`
+      ${state.currentURL !== null ? html`
+        <button
+          icon size="sm" variant="ghost" class="artifact-close-browser"
+          @click=${() => state.reset()}
+          aria-label="Return to document"
+          title="Close browsing and return to document"
+        >
+          <tv-icon name="close" size="sm"></tv-icon>
+        </button>
+      ` : null}
       <button
         icon
         size="sm"

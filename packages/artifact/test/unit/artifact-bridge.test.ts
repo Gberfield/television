@@ -209,6 +209,7 @@ describe("installBridge", () => {
     );
     const readyOrder = parentPostMessage.mock.invocationCallOrder[0]!;
     expect(addEventListener.mock.calls.map(([type]) => type)).toEqual([
+      "message",
       "pagehide",
       "pageshow",
       "keydown",
@@ -630,10 +631,12 @@ describe("installBridge", () => {
   });
 
   it("fallback click interception posts regular anchor navigations", () => {
-    const win = makeFramedWindow();
+    const win = makeFramedWindow("https://internal.test/current");
+    const root = win.document.documentElement ?? win.document.appendChild(win.document.createElement("html"));
+    root.appendChild(win.document.createElement("body"));
     const parentPostMessage = vi.spyOn(win.parent, "postMessage");
     Object.defineProperty(win, "navigation", { configurable: true, value: undefined });
-    win.document.body.innerHTML = `<a id="link" href="https://example.com/path">go</a>`;
+    win.document.body.innerHTML = `<a id="link" href="https://internal.test/path">go</a>`;
     installBridge(win);
     parentPostMessage.mockClear();
 
@@ -643,7 +646,7 @@ describe("installBridge", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(parentPostMessage).toHaveBeenCalledWith(
-      { type: "navigation-request", url: "https://example.com/path" },
+      { type: "navigation-request", url: "https://internal.test/path" },
       "*",
     );
   });
@@ -703,6 +706,27 @@ describe("installBridge", () => {
     expect(click("application", { altKey: true }).defaultPrevented).toBe(true);
     expect(click("web", { ctrlKey: true }).defaultPrevented).toBe(false);
     expect(click("script", { ctrlKey: true }).defaultPrevented).toBe(false);
+    expect(parentPostMessage).not.toHaveBeenCalled();
+  });
+
+  // spec: proofs/arch/artifact-frame/artifact-bridge.md#^ab-ac-external-policy-browser
+  it("opens an ordinary external website outside without artifact navigation", () => {
+    const win = makeFramedWindow("https://internal.test/current");
+    const parentPostMessage = vi.spyOn(win.parent, "postMessage");
+    const open = vi.spyOn(win, "open").mockReturnValue(null);
+    const root = win.document.documentElement ?? win.document.appendChild(win.document.createElement("html"));
+    const body = win.document.body ?? root.appendChild(win.document.createElement("body"));
+    body.innerHTML = '<a href="https://example.com/">Website</a>';
+    installBridge(win);
+    win.dispatchEvent(new MessageEvent("message", {
+      source: win.parent,
+      data: { type: "external-link-policy", openExternalWebLinks: true, sourceOrigin: "https://internal.test" },
+    }));
+    parentPostMessage.mockClear();
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    win.document.querySelector("a")!.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(open).toHaveBeenCalledWith("https://example.com/", "_blank", "noopener,noreferrer");
     expect(parentPostMessage).not.toHaveBeenCalled();
   });
 

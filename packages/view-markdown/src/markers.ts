@@ -1008,7 +1008,7 @@ const renderingTheme = EditorView.theme({
   },
   // Link labels rendered through `Decoration.mark({ tagName: "a" })`.
   // The authoritative color sheet supplies the current link role.
-  // Links are clickable by default now: plain click navigates inside
+  // Links are clickable by default: external websites open outside
   // Television, Alt/Option-click edits, and Cmd/Ctrl-click opens
   // externally.
   [`a.${LINK_CLASS}`]: {
@@ -1109,7 +1109,7 @@ function activatePendingLink(event: MouseEvent): boolean {
   const target = classifyLinkTarget(pending.url, window.document.baseURI);
   if (target.kind === "application") {
     openApplicationLink(target.url);
-  } else if (target.kind === "web" && pending.openExternally) {
+  } else if (target.kind === "web" && (pending.openExternally || new URL(target.url).origin !== window.location.origin)) {
     window.open(target.url, "_blank", "noopener,noreferrer");
   } else if (target.kind === "web") {
     postNavigationRequest(target.url);

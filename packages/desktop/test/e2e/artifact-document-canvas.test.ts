@@ -8,12 +8,20 @@ import { startConnectTestServer } from "./connect-server.ts";
 import { launchDesktop } from "./helpers.ts";
 
 async function pixel(app: ElectronApplication, page: Page, x: number, y: number): Promise<number[]> {
-  const image = (await page.screenshot({ scale: "css" })).toString("base64");
-  return app.evaluate(({ nativeImage }, { image, x, y }) => {
-    const bitmap = nativeImage.createFromBuffer(Buffer.from(image, "base64"))
-      .crop({ x, y, width: 1, height: 1 }).toBitmap();
+  const image = (await page.screenshot({ scale: "device" })).toString("base64");
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  return app.evaluate(({ nativeImage }, { image, x, y, viewport }) => {
+    const decoded = nativeImage.createFromBuffer(Buffer.from(image, "base64"));
+    const size = decoded.getSize();
+    // Electron screenshots contain physical pixels; layout coordinates are CSS pixels.
+    const bitmap = decoded.crop({
+      x: Math.round(x * size.width / viewport.width),
+      y: Math.round(y * size.height / viewport.height),
+      width: 1,
+      height: 1,
+    }).toBitmap();
     return [bitmap[2], bitmap[1], bitmap[0]];
-  }, { image, x, y });
+  }, { image, x, y, viewport });
 }
 
 // proofs/ui/app/artifact-frame/index.md#^af-ui-ac-document-canvas

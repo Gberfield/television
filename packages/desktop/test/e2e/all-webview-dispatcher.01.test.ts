@@ -231,6 +231,58 @@ test.describe("Electron all-webview dispatcher", () => {
     }
   });
 
+  // spec: proofs/product/artifact-navigation.md#^ac-ordinary-external-electron
+  test("ordinary HTML links open outside without navigating the webview", async () => {
+    if (!server) throw new Error("Product server was not started");
+    const external = await startExternalSite();
+    externalServer = external.server;
+    const filePath = path.join(server.home, "ordinary-external.html");
+    writeFileSync(filePath, `<h1>Local document</h1><a id="external" href="${external.url}">Website</a>`);
+    const artifactID = await createPathArtifact(server, filePath);
+    const { app, page } = await launchApp(server);
+    try {
+      await expect(page.locator(".artifact-view webview.artifact-content")).toBeVisible({ timeout: 15_000 });
+      await expect.poll(() => webviewText(app, "h1")).toBe("Local document");
+      const initialURL = await webviewURL(app);
+      await clickVisibleWebviewLink(app, page, "#external");
+      await expect.poll(() => app.evaluate(() => {
+        return (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog ?? [];
+      })).toContain(external.url);
+      expect(await webviewURL(app)).toBe(initialURL);
+      expect(await navigationRecord(page, artifactID)).toBeNull();
+    } finally { await app.close(); }
+  });
+
+  // spec: proofs/product/artifact-navigation.md#^ac-url-artifact-links
+  test("URL artifacts with a proxy-shaped pathname keep ordinary navigation embedded", async () => {
+    if (!server) throw new Error("Product server was not started");
+    const external = await startExternalSite();
+    externalServer = external.server;
+    const initialURL = new URL("/artifact/01ARZ3NDEKTSV4RRFFQ69G5FAV/index.html", external.url).href;
+    await createURLArtifact(server, initialURL);
+    const { app, page } = await launchApp(server);
+    try {
+      await expect.poll(() => webviewURL(app)).toBe(initialURL);
+      await app.evaluate(async ({ webContents }, url) => {
+        const guest = webContents.getAllWebContents().find((value) => value.getType() === "webview");
+        if (!guest) throw new Error("No webview found");
+        await guest.executeJavaScript(`document.body.innerHTML = '<a id="cross-origin" href="${url}">Other site</a>'`);
+      }, new URL(external.url).href.replace("127.0.0.1", "localhost"));
+      const destination = external.url.replace("127.0.0.1", "localhost");
+      const point = await app.evaluate(async ({ webContents }) => {
+        const guest = webContents.getAllWebContents().find((value) => value.getType() === "webview");
+        if (!guest) throw new Error("No webview found");
+        return await guest.executeJavaScript("(() => { const rect = document.querySelector('#cross-origin').getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()");
+      });
+      // A cross-document click replaces the gesture receipt with the destination.
+      await page.locator(".artifact-view webview.artifact-content").click({ position: point });
+      await expect.poll(() => webviewURL(app)).toBe(destination);
+      expect(await app.evaluate(() => {
+        return (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog ?? [];
+      })).toEqual([]);
+    } finally { await app.close(); }
+  });
+
   // spec: proofs/arch/artifact-frame/artifact-bridge.md#^ab-ac-application-link-electron-seam
   test("local HTML application handoff requires activation and preserves subframes", async () => {
     if (!server) throw new Error("Product server was not started");

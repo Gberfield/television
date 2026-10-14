@@ -44,6 +44,13 @@ export interface URLTargetNotification {
   url: string | null;
 }
 
+/** Host-owned disposition for ordinary external website links. */
+export interface ExternalLinkPolicyNotification {
+  type: "external-link-policy";
+  openExternalWebLinks: boolean;
+  sourceOrigin: string;
+}
+
 /**
  * View → host missing-artifact request. Emitted by the bundled artifact-missing
  * view so the host can provide registry metadata without putting it in the
@@ -171,6 +178,7 @@ export function isNavigationKeyChord(
  * `../artifact-view-protocol.ts` is a separate union.
  */
 export type BridgeMessage =
+  | ExternalLinkPolicyNotification
   | URLTargetRequest
   | URLTargetNotification
   | ArtifactMissingRequest
@@ -326,6 +334,16 @@ export function installBridge(win: Window = window, options: InstallBridgeOption
     return;
   }
   bridgeWindow.__televisionArtifactBridgeInstalled = true;
+
+  let openExternalWebLinks = false;
+  win.addEventListener("message", (event) => {
+    const value = event.data as Partial<ExternalLinkPolicyNotification> | null;
+    if (event.source !== win.parent || value?.type !== "external-link-policy" ||
+      typeof value.openExternalWebLinks !== "boolean" || typeof value.sourceOrigin !== "string") return;
+    openExternalWebLinks = value.openExternalWebLinks && value.sourceOrigin !== "null" &&
+      value.sourceOrigin === win.location.origin;
+  });
+
 
   const makeBridgeGuid = (): string => {
     const GUID_RADIX = 36;
@@ -550,6 +568,13 @@ export function installBridge(win: Window = window, options: InstallBridgeOption
       if (!elementConstructor || !(event.target instanceof elementConstructor)) return;
       const anchor = event.target.closest("a[href]") as HTMLAnchorElement | null;
       if (!anchor) return;
+      const external = webNavigationURL(anchor.href, win.document.baseURI);
+      const plainClick = leftClick && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+      if (openExternalWebLinks && plainClick && external && external.origin !== win.location.origin && !anchor.hasAttribute("download")) {
+        event.preventDefault();
+        win.open(external.href, "_blank", "noopener,noreferrer");
+        return;
+      }
       const url = applicationNavigationURL(anchor.href, win.document.baseURI);
       if (!url) return;
       const target = anchor.target.toLowerCase();
@@ -610,6 +635,7 @@ export function installBridge(win: Window = window, options: InstallBridgeOption
         "click",
         (event) => {
           const mouse = event as MouseEvent;
+          if (mouse.defaultPrevented) return;
           // Modifier-clicks are intentionally left to browser defaults instead
           // of being intercepted into host-managed artifact history. Cmd/Ctrl
           // opens a new tab, Shift opens a new window, and middle-click/auxclick

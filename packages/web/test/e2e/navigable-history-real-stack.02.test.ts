@@ -7,8 +7,6 @@ import { APPLICATION_SHELL_STATES, waitForApplicationRender } from "../../../../
 import { artifactNavigationStorageKey } from "../../src/services/artifact-navigation-state.ts";
 import { configureTestMotion, pickChannelByName } from "./helpers.ts";
 
-const EXTERNAL_URL = "https://example.com/external";
-
 type NavigationRecord = {
   v: 1;
   entries: Array<{ url: string }>;
@@ -153,31 +151,85 @@ test.describe("real-stack browser navigable history", () => {
 
   test.describe("external browser navigation", () => {
 
-  test("external browser navigation uses the real unsupported view and host history", async ({ page, baseURL }) => {
+  // spec: proofs/product/artifact-navigation.md#^ac-external-normal
+  test("ordinary external HTML links open outside with the document and history unchanged", async ({ page, baseURL }) => {
     if (!server) throw new Error("Product server was not started");
-    const siteDir = path.join(server.home, "external-site");
-    mkdirSync(siteDir, { recursive: true });
-    writeFileSync(path.join(siteDir, "index.html"), html(`
-      <h1>Index</h1>
-      <a id="external" href="${EXTERNAL_URL}">External</a>
-    `));
-    const artifactID = await createPathArtifact(server, `${siteDir}${path.sep}`, "External Site");
+    const destination = await launchProductServer();
+    try {
+      const externalURL = `${destination.serverURL}/health`;
+      const siteDir = path.join(server.home, "external-site");
+      mkdirSync(siteDir, { recursive: true });
+      writeFileSync(path.join(siteDir, "index.html"), html(`<h1>Index</h1><a id="external" href="${externalURL}">External</a>`));
+      const artifactID = await createPathArtifact(server, `${siteDir}${path.sep}`, "External Site");
+      await openApp(page, server, baseURL);
+      const frame = page.frameLocator(".artifact-view iframe.artifact-content").first();
+      await expect(frame.locator("h1")).toHaveText("Index");
+      const before = await navigationRecord(page, artifactID);
+      const popupPromise = page.waitForEvent("popup");
+      await activateFrameLink(page, "#external");
+      const popup = await popupPromise;
+      await popup.waitForLoadState("domcontentloaded");
+      expect(popup.url()).toBe(externalURL);
+      await expect(frame.locator("h1")).toHaveText("Index");
+      expect(await navigationRecord(page, artifactID)).toEqual(before);
+      await popup.close();
+    } finally {
+      await destination.dispose();
+    }
+  });
+  });
 
+  // spec: proofs/product/artifact-navigation.md#^ac-return-document
+  test("return to document skips the browsing trail and clears history", async ({ page, baseURL }) => {
+    if (!server) throw new Error("Product server was not started");
+    const siteDir = path.join(server.home, "return-site");
+    mkdirSync(siteDir, { recursive: true });
+    writeFileSync(path.join(siteDir, "index.html"), html('<h1>Original</h1><a id="next" href="two.html">Next</a>'));
+    writeFileSync(path.join(siteDir, "two.html"), html('<h1>Second</h1><a id="next" href="three.html">Next</a>'));
+    writeFileSync(path.join(siteDir, "three.html"), html('<h1>Third</h1>'));
+    const artifactID = await createPathArtifact(server, siteDir, "Return document");
     await openApp(page, server, baseURL);
     const frame = page.frameLocator(".artifact-view iframe.artifact-content").first();
-    await activateFrameLink(page, "#external");
-
-    await expect(page.locator(".artifact-view iframe.artifact-content")).toHaveAttribute("src", "/views/url-unsupported/");
-    await expect(frame.locator("h1")).toContainText("This is an external web page");
-    await expect(frame.getByRole("link", { name: EXTERNAL_URL })).toHaveAttribute("href", EXTERNAL_URL);
-    await expect.poll(() => navigationRecord(page, artifactID)).toMatchObject({
-      entries: [{ url: EXTERNAL_URL }],
-      cursor: 0,
-    });
-
-    await page.locator(".artifact-view button[aria-label='Back']").click();
-    await expect(frame.locator("h1")).toHaveText("Index");
+    await activateFrameLink(page, "#next");
+    await expect(frame.locator("h1")).toHaveText("Second");
+    await activateFrameLink(page, "#next");
+    await expect(frame.locator("h1")).toHaveText("Third");
+    await page.getByRole("button", { name: "Return to document", exact: true }).click();
+    await expect(frame.locator("h1")).toHaveText("Original");
+    expect(await navigationRecord(page, artifactID)).toMatchObject({ entries: [], cursor: -1 });
+    await expect(page.getByRole("button", { name: "Return to document", exact: true })).toHaveCount(0);
   });
+
+  // spec: proofs/product/artifact-navigation.md#^ac-markdown-reading-position
+  test("return to Markdown restores its reading position through the real host", async ({ page, baseURL }) => {
+    if (!server || !baseURL) throw new Error("Product server was not started");
+    const markdownPath = path.join(server.home, "reading-position.md");
+    writeFileSync(markdownPath, "# Reading position");
+    await createPathArtifact(server, markdownPath, "Reading position");
+    const htmlPath = path.join(server.home, "linked.html");
+    writeFileSync(htmlPath, html("<h1>Linked document</h1>"));
+    const htmlID = await createPathArtifact(server, htmlPath, "Linked document");
+    const appURL = await server.appURL(baseURL);
+    const localURL = `${appURL}/artifact/${htmlID}/linked.html`;
+    const LINK_PARAGRAPH = 20;
+    const PARAGRAPH_COUNT = 80;
+    writeFileSync(markdownPath, "# Reading position\n\n" + Array.from({ length: PARAGRAPH_COUNT }, (_, index) =>
+      `${index === LINK_PARAGRAPH ? `[Local document](${localURL})\n\n` : ""}Paragraph ${index}: Reading position fixture.\n\n`
+    ).join(""));
+    await openApp(page, server, baseURL);
+    const frame = page.frameLocator(".artifact-view iframe.artifact-content[data-content-url]");
+    const scroller = frame.locator(".cm-scroller");
+    const READING_OFFSET = 600;
+    await scroller.evaluate((node, offset) => { node.scrollTop = offset; }, READING_OFFSET);
+    const link = frame.locator(`a.cm-md-link[data-href="${localURL}"]`);
+    await link.scrollIntoViewIfNeeded();
+    const previous = await scroller.evaluate((node) => node.scrollTop);
+    expect(previous).toBeGreaterThan(0);
+    await link.click();
+    await expect(page.getByRole("button", { name: "Return to document", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Return to document", exact: true }).click();
+    await expect(frame.locator(".cm-content")).toContainText("Reading position");
+    await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBe(previous);
   });
 
   test("markdown artifact loads and saves through the real source-served browser iframe editor", async ({ page, baseURL }) => {
