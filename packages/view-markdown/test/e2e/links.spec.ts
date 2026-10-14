@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Markdown link syntax `[label](url)` renders the label as an `<a
 // class="cm-md-link" data-href="url">` decoration with no real `href`.
 // Click semantics:
-//   - Plain click posts a Television navigation-request and keeps the caret put.
+//   - Plain external click opens outside and keeps the caret put.
 //   - Alt/Option-click lets CodeMirror place the caret for editing.
 //   - Cmd/Ctrl-click opens a web URL in a new browser context; application
 //     links always use a same-context handoff.
@@ -186,7 +186,7 @@ test.describe("markdown link activation", () => {
     expect(style.color).not.toMatch(/^rgb\(0,\s*0,\s*255\)/);
   });
 
-  test("plain click posts a navigation-request and does not move the caret", async ({ page }) => {
+  test("plain external click opens outside and does not move the caret", async ({ page }) => {
     await setCaret(page, 0);
     const initialURL = page.url();
     const anchor = page
@@ -195,10 +195,8 @@ test.describe("markdown link activation", () => {
 
     await anchor.click();
 
-    expect(await navigationRequests(page)).toEqual([
-      { type: "navigation-request", url: SEED_HTTPS_RESOLVED_URL },
-    ]);
-    expect(await windowOpenCalls(page)).toEqual([]);
+    expect(await navigationRequests(page)).toEqual([]);
+    expect(await windowOpenCalls(page)).toEqual([{ url: SEED_HTTPS_RESOLVED_URL, target: "_blank", features: "noopener,noreferrer" }]);
     expect(await caretHead(page)).toBe(0);
     expect(page.url()).toBe(initialURL);
   });
@@ -292,4 +290,33 @@ test.describe("markdown link activation", () => {
     expect(await navigationRequests(page)).toEqual([]);
     expect(await windowOpenCalls(page)).toEqual([]);
   });
+});
+
+test("external click opens a real browser page while preserving the document", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".cm-content").waitFor();
+  const external = new URL(page.url());
+  external.hostname = external.hostname === "localhost" ? "127.0.0.1" : "localhost";
+  await replaceDocument(page, `[Website](${external.href})`);
+  const original = page.url();
+  const popupPromise = page.waitForEvent("popup");
+  await page.locator("a.cm-md-link").click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState("domcontentloaded");
+  expect(popup.url()).toBe(external.href);
+  expect(page.url()).toBe(original);
+  await expect(page.locator(".cm-content")).toContainText("Website");
+  await popup.close();
+});
+
+test("restores the Markdown reading position after returning to its view", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 450 });
+  await page.goto("/");
+  const scroller = page.locator(".cm-scroller");
+  await scroller.waitFor();
+  await scroller.evaluate((node) => { node.scrollTop = 550; });
+  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(400);
+  const previous = await scroller.evaluate((node) => node.scrollTop);
+  await page.reload();
+  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBe(previous);
 });

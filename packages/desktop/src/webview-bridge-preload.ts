@@ -107,6 +107,15 @@ function handleApplicationAnchorActivation(event: MouseEvent): void {
   const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
   if (!anchor) return;
   const link = classifyLinkTarget(anchor.href, window.document.baseURI);
+  // Local authored documents hand external websites to the host browser.
+  // A URL artifact remains a deliberately embedded browsing surface.
+  const source = new URL(window.location.href);
+  if (link.kind === "web" && /^\/artifact\/[0-9A-Za-z]{26}(\/|$)/.test(source.pathname)
+    && new URL(link.url).origin !== source.origin && !anchor.hasAttribute("download")) {
+    event.preventDefault();
+    window.open(link.url, "_blank", "noopener,noreferrer");
+    return;
+  }
   if (link.kind !== "application") return;
   event.preventDefault();
   openApplicationLink(link.url);

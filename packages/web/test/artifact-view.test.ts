@@ -1572,6 +1572,18 @@ describe("artifact-frame view rendering dispatcher", () => {
     ]);
   });
 
+  it("returns directly to the document and clears browsing history", async () => {
+    setNavigationFixture("return-md", ["https://example.com/", "https://example.com/second"], 1);
+    const el = mount({ id: "return-md", kind: "path", title: "Note", path: "/tmp/note.md" });
+    await flush();
+    button(el, "Return to document").click();
+    await flush();
+    expect(navigationRecord("return-md")?.entries).toEqual([]);
+    expect(navigationRecord("return-md")?.cursor).toBe(-1);
+    expect(frame(el).getAttribute("src")).toBe("/views/markdown/");
+    expect(el.querySelector("button[aria-label='Return to document']")).toBeNull();
+  });
+
   it("renders Electron markdown artifacts through webview with content IPC metadata", async () => {
     window.history.replaceState(null, "", "/?mode=electron");
     const el = mount({ id: "md", kind: "path", title: "Note", path: "/tmp/note.md" });

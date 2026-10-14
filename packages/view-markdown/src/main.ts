@@ -65,3 +65,61 @@ const view = context === null
 // programmatically. Harmless in production; the package is private and
 // only ever loaded inside the editor iframe.
 (window as Window & { __cmView?: EditorView }).__cmView = view;
+
+// Remember the reading position in this view's browser session. Hashing the
+// content separates documents without persisting Markdown text in storage.
+function readingPositionKey(): string {
+  const content = view.state.doc.toString();
+  const FNV_OFFSET = 2166136261;
+  const FNV_PRIME = 16777619;
+  const HEX_RADIX = 16;
+  let hash = FNV_OFFSET;
+  for (let index = 0; index < content.length; index += 1) {
+    hash = Math.imul(hash ^ content.charCodeAt(index), FNV_PRIME);
+  }
+  return `television:reading-position:${(hash >>> 0).toString(HEX_RADIX)}:${content.length}`;
+}
+
+let restoringPosition = false;
+function saveReadingPosition(): void {
+  if (restoringPosition || view.state.doc.length === 0) return;
+  try {
+    sessionStorage.setItem(readingPositionKey(), JSON.stringify({
+      top: view.scrollDOM.scrollTop,
+      left: view.scrollDOM.scrollLeft,
+    }));
+  } catch {
+    // Restricted/full storage must not prevent reading or navigation.
+  }
+}
+
+function restoreReadingPosition(): void {
+  let position: { top: number; left: number };
+  try {
+    const raw = sessionStorage.getItem(readingPositionKey());
+    if (!raw) return;
+    position = JSON.parse(raw) as typeof position;
+    if (!Number.isFinite(position.top) || !Number.isFinite(position.left)) return;
+  } catch { return; }
+  restoringPosition = true;
+  view.requestMeasure({
+    read: () => position,
+    write: (saved) => {
+      view.scrollDOM.scrollTo(saved.left, saved.top);
+      requestAnimationFrame(() => { restoringPosition = false; });
+    },
+  });
+}
+
+view.scrollDOM.addEventListener("scroll", saveReadingPosition, { passive: true });
+window.addEventListener("pagehide", saveReadingPosition);
+if (context === null) {
+  restoreReadingPosition();
+} else {
+  let initialContent = true;
+  context.addEventListener("content-updated", () => {
+    if (!initialContent) return;
+    initialContent = false;
+    restoreReadingPosition();
+  });
+}
