@@ -448,10 +448,12 @@ Television artifacts are registry records that point at external content. The CL
 `tv create-path-artifact` creates a path artifact on a channel:
 
 ```bash
-tv create-path-artifact --channel <id> --title <title> --path <path> (--focus-artifact|--no-focus)
+tv create-path-artifact --channel <id> --title <title> --path <path> [--before <artifact-id>|--after <artifact-id>] (--focus-artifact|--no-focus)
 ```
 
 The CLI trims surrounding whitespace from `--path` before sending it to the server. The server accepts absolute markdown files ending in `.md` or `.markdown`, absolute HTML files ending in `.htm` or `.html`, and absolute directories with a root `index.html` or `index.htm`. A trailing separator on a directory path is optional. The server validates that the target exists and is readable from the server host. Stored directory paths end with a trailing separator; stored file paths do not.
+
+The new artifact goes at the end of the channel's order, or beside another artifact when `--before` or `--after` names one ([#^cli-before-after](#^cli-before-after)).
 
 Exactly one focus directive is required. `--focus-artifact` creates the artifact and sends a transient artifact-focus nudge for it. `--no-focus` creates the artifact without changing focus. Success prints:
 
@@ -465,10 +467,12 @@ Television registered <trimmed-path>.
 `tv create-url-artifact` creates a URL artifact on a channel:
 
 ```bash
-tv create-url-artifact --channel <id> --title <title> --url <url> (--focus-artifact|--no-focus)
+tv create-url-artifact --channel <id> --title <title> --url <url> [--before <artifact-id>|--after <artifact-id>] (--focus-artifact|--no-focus)
 ```
 
 The CLI trims surrounding whitespace from `--url` before sending it to the server and before printing the confirmation. The URL must be `http://` or `https://` after trimming and server validation.
+
+The new artifact goes at the end of the channel's order, or beside another artifact when `--before` or `--after` names one ([#^cli-before-after](#^cli-before-after)).
 
 Exactly one focus directive is required. `--focus-artifact` creates the artifact and sends a transient artifact-focus nudge for it. `--no-focus` creates the artifact without changing focus. Success prints:
 
@@ -507,13 +511,14 @@ url artifact <artifact-id> deleted from the registry.
 
 ### Arranging and moving artifacts
 
-`tv reposition-artifact --id <id> [--width <px>] [--height <px>] [--full-screen|--no-full-screen] [--position <n>]` changes the arrangement of an artifact's tab page ([tab-pages.md](./tab-pages.md)), on whatever channel holds it. The changes it makes are the ones a person makes in the app by resizing, entering or leaving full-screen, and reordering ([ui/app/stage/index.md](../ui/app/stage/index.md)), and connected clients show them the same way. ^cli-reposition-artifact
+`tv reposition-artifact --id <id> [--width <px>] [--height <px>] [--full-screen|--no-full-screen] [--position <n>|--before <artifact-id>|--after <artifact-id>]` changes the arrangement of an artifact's tab page ([tab-pages.md](./tab-pages.md)), on whatever channel holds it. The changes it makes are the ones a person makes in the app by resizing, entering or leaving full-screen, and reordering ([ui/app/stage/index.md](../ui/app/stage/index.md)), and connected clients show them the same way. ^cli-reposition-artifact
 
 - `--width` and `--height` set the artifact's size in reference pixels ([arch/layout/index.md#^ly-page-size](../arch/layout/index.md#^ly-page-size)); either may be given alone. Each must be a finite, positive number. As with a dragged size, a size larger than the stage is accepted and limited where the artifact is drawn.
 - `--full-screen` makes the artifact full-screen and `--no-full-screen` takes it out of full-screen. Neither changes the artifact's size, so leaving full-screen returns the artifact to its size ([arch/layout/index.md#^ly-fullscreen-mode](../arch/layout/index.md#^ly-fullscreen-mode)).
 - `--position <n>` moves the artifact to position `n` in the channel's order, counting from `1` at the left; the other artifacts keep their order around it.
+- `--before <artifact-id>` and `--after <artifact-id>` move the artifact beside another artifact on its channel ([#^cli-before-after](#^cli-before-after)). An artifact already in that place stays there, and the command still succeeds.
 - The changes given apply together, or none do.
-- The command requires at least one of these options. Giving none, giving both `--full-screen` and `--no-full-screen`, a size that is not a finite positive number, or a position that is not a whole number from `1` to the channel's last position is an error, and nothing changes.
+- The command requires at least one of these options. Giving none, giving both `--full-screen` and `--no-full-screen`, giving more than one of `--position`, `--before`, and `--after`, naming the artifact itself with `--before` or `--after`, a size that is not a finite positive number, or a position that is not a whole number from `1` to the channel's last position is an error, and nothing changes.
 
 Success prints:
 
@@ -527,15 +532,21 @@ The command reads the channel and then sends its whole new arrangement. If an ar
 Channel <channel-id> changed before artifact <artifact-id> could be repositioned, so nothing changed. Run the command again.
 ```
 
+`--before <artifact-id>` places an artifact immediately before the named artifact in the channel's order, which is to its left, and `--after <artifact-id>` places it immediately after, to its right. The other artifacts keep their order. `tv create-path-artifact`, `tv create-url-artifact`, `tv move-artifact`, and `tv reposition-artifact` accept them, and each accepts at most one of the two. The named artifact must be on the channel the artifact is placed on: the `--channel` channel for the creation commands and `tv move-artifact`, and the artifact's own channel for `tv reposition-artifact`. When it is not, or no artifact has that ID, the command exits `1`, changes nothing, and prints this error before the standard bundled-skills recovery pointer: ^cli-before-after
+
+```text
+Artifact <named-artifact-id> is not on channel <channel-id>.
+```
+
 The help, output, and errors of `tv reposition-artifact` and `tv move-artifact` speak of artifacts and their order and size. They do not say "page" or "tab page", which are internal terms. ^cli-arrangement-wording
 
-`tv move-artifact --id <id> --channel <channel-id> (--focus-artifact|--no-focus)` moves an artifact to another channel ([product/artifacts.md#^af-move](./artifacts.md#^af-move)). Exactly one focus directive is required. `--focus-artifact` sends a transient artifact-focus nudge for the artifact after the move, which takes clients to its new channel; `--no-focus` leaves focus unchanged. Success prints: ^cli-move-artifact
+`tv move-artifact --id <id> --channel <channel-id> [--before <artifact-id>|--after <artifact-id>] (--focus-artifact|--no-focus)` moves an artifact to another channel ([product/artifacts.md#^af-move](./artifacts.md#^af-move)). It goes at the end of that channel's order, or beside another artifact when `--before` or `--after` names one ([#^cli-before-after](#^cli-before-after)). Exactly one focus directive is required. `--focus-artifact` sends a transient artifact-focus nudge for the artifact after the move, which takes clients to its new channel; `--no-focus` leaves focus unchanged. Success prints: ^cli-move-artifact
 
 ```text
 Artifact <artifact-id> moved to channel <channel-id>.
 ```
 
-When the artifact is already on that channel, nothing changes; the command still sends the nudge if `--focus-artifact` was given, and prints:
+When the artifact is already on that channel, nothing changes, and `--before` and `--after` are ignored; `tv reposition-artifact` changes its place in the order. The command still sends the nudge if `--focus-artifact` was given, and prints:
 
 ```text
 Artifact <artifact-id> is already on channel <channel-id>.
