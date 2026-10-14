@@ -231,7 +231,7 @@ test.describe("Electron all-webview dispatcher", () => {
     }
   });
 
-  // spec: proofs/product/artifact-navigation.md#^ac-external-normal
+  // spec: proofs/product/artifact-navigation.md#^ac-ordinary-external-electron
   test("ordinary HTML links open outside without navigating the webview", async () => {
     if (!server) throw new Error("Product server was not started");
     const external = await startExternalSite();
