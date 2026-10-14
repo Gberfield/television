@@ -367,7 +367,7 @@ test.describe("Electron all-webview dispatcher", () => {
   });
   });
 
-  test("markdown Cmd/Ctrl-click opens an external link without navigating the webview", async () => {
+  test("markdown ordinary and Cmd/Ctrl clicks open externally without navigating the webview", async () => {
     if (!server) throw new Error("Product server was not started");
     const external = await startExternalSite();
     externalServer = external.server;
@@ -385,6 +385,15 @@ test.describe("Electron all-webview dispatcher", () => {
       const initialWebviewURL = await webviewURL(app);
       expect(initialWebviewURL).toContain("/views/markdown/");
 
+      await app.evaluate(() => {
+        (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog = [];
+      });
+      await clickVisibleWebviewLink(app, page, linkSelector);
+      await expect.poll(() => app.evaluate(() => {
+        return (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog ?? [];
+      }), { timeout: 15_000 }).toEqual([external.url]);
+      expect(await webviewURL(app)).toBe(initialWebviewURL);
+      expect(await navigationRecord(page, artifactID)).toBeNull();
       await app.evaluate(() => {
         (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog = [];
       });

@@ -29,6 +29,20 @@ A frame's document handles its own input and, in the general case, tells its emb
 
 The bridge observes and relays. It cancels the navigation chord's native default and the link or form defaults identified under [Link handling](#link-handling). Which web-document navigations are cancelled is code-governed ([the navigation-recording carve-out](./reload-navigation.md#^nav-recording-carve-out)). It never rewrites a document's DOM or rendered content. The product-level statements are [product/artifacts.md](../../product/artifacts.md) and [product/artifact-navigation.md](../../product/artifact-navigation.md).
 
+## Host-owned external website disposition
+
+On each accepted `bridge-ready`, the host replies through that current frame's transport:
+
+```ts
+interface ExternalLinkPolicyNotification {
+  type: "external-link-policy";
+  openExternalWebLinks: boolean;
+  sourceOrigin: string;
+}
+```
+
+The registry artifact kind owns the flag: path documents receive true; explicit URL artifacts receive false. `sourceOrigin` is the connected Television host document's origin. Consumers start false and enable outside opening only for a true flag with a non-opaque origin matching the loaded document. Browser frames accept this notification only from their parent window; Electron receives it through the host-to-webview IPC channel. A guest pathname never substitutes for registry kind or connected origin. The listener is installed before readiness is emitted. The disposition applies to ordinary external website anchors; application handoff and internal navigation keep their existing owners. ^ab-external-website-policy
+
 ## Link handling
 
 Every bridge-owned link or form path resolves its target against the artifact document's base URL and assigns one of four dispositions:

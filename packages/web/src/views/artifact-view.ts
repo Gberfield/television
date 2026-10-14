@@ -250,6 +250,12 @@ export class ArtifactView extends View<[ApplicationService, Artifact, ArtifactVi
         this.handleArtifactPointer(message);
         return;
       case "bridge-ready":
+        transport.send({
+          type: "external-link-policy",
+          openExternalWebLinks: this._artifact?.kind === "path",
+          sourceOrigin: window.location.origin,
+        });
+        return;
       case "leaving":
         // Lifecycle is owned by the channel.
         return;

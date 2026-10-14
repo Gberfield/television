@@ -209,6 +209,7 @@ describe("installBridge", () => {
     );
     const readyOrder = parentPostMessage.mock.invocationCallOrder[0]!;
     expect(addEventListener.mock.calls.map(([type]) => type)).toEqual([
+      "message",
       "pagehide",
       "pageshow",
       "keydown",
@@ -708,6 +709,7 @@ describe("installBridge", () => {
     expect(parentPostMessage).not.toHaveBeenCalled();
   });
 
+  // spec: proofs/arch/artifact-frame/artifact-bridge.md#^ab-ac-external-policy-browser
   it("opens an ordinary external website outside without artifact navigation", () => {
     const win = makeFramedWindow("https://internal.test/current");
     const parentPostMessage = vi.spyOn(win.parent, "postMessage");
@@ -716,6 +718,10 @@ describe("installBridge", () => {
     const body = win.document.body ?? root.appendChild(win.document.createElement("body"));
     body.innerHTML = '<a href="https://example.com/">Website</a>';
     installBridge(win);
+    win.dispatchEvent(new MessageEvent("message", {
+      source: win.parent,
+      data: { type: "external-link-policy", openExternalWebLinks: true, sourceOrigin: "https://internal.test" },
+    }));
     parentPostMessage.mockClear();
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     win.document.querySelector("a")!.dispatchEvent(click);

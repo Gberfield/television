@@ -15,6 +15,17 @@ import { OPEN_APPLICATION_LINK_CHANNEL } from "./application-link.ts";
 
 const BRIDGE_CHANNEL = "television-artifact-bridge";
 
+let openExternalWebLinks = false;
+ipcRenderer.on(BRIDGE_CHANNEL, (_event, value: unknown) => {
+  if (!value || typeof value !== "object") return;
+  const policy = value as { type?: unknown; openExternalWebLinks?: unknown; sourceOrigin?: unknown };
+  if (policy.type !== "external-link-policy" || typeof policy.openExternalWebLinks !== "boolean" ||
+    typeof policy.sourceOrigin !== "string") return;
+  openExternalWebLinks = policy.openExternalWebLinks && policy.sourceOrigin !== "null" &&
+    policy.sourceOrigin === window.location.origin;
+});
+
+
 type BridgeMessage =
   | {
     type: "bridge-ready";
@@ -110,7 +121,7 @@ function handleApplicationAnchorActivation(event: MouseEvent): void {
   // Local authored documents hand external websites to the host browser.
   // A URL artifact remains a deliberately embedded browsing surface.
   const source = new URL(window.location.href);
-  if (link.kind === "web" && /^\/artifact\/[0-9A-Za-z]{26}(\/|$)/.test(source.pathname)
+  if (link.kind === "web" && openExternalWebLinks
     && new URL(link.url).origin !== source.origin && !anchor.hasAttribute("download")) {
     event.preventDefault();
     window.open(link.url, "_blank", "noopener,noreferrer");

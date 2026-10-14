@@ -877,7 +877,7 @@ describe("artifact-frame view rendering dispatcher", () => {
     el.artifact = { id: "html", kind: "path", title: "Retitled", path: "/tmp/missing.html" };
     await flush();
 
-    expect(postMessage).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "artifact-missing" }), "*");
   });
 
   // spec: proofs/arch/artifact-frame/artifact-bridge.md#^ab-ac-view-replies
@@ -917,7 +917,7 @@ describe("artifact-frame view rendering dispatcher", () => {
     el.artifact = { id: "html", kind: "path", title: "Renamed while external", path: "/tmp/missing.html" };
     await flush();
 
-    expect(send).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalledWith("television-artifact-bridge", expect.objectContaining({ type: "artifact-missing" }));
 
     el.artifact = { id: "html", kind: "path", title: "Moved HTML", path: "/tmp/moved.html" };
     await flush();
@@ -1570,6 +1570,27 @@ describe("artifact-frame view rendering dispatcher", () => {
     expect(navigationRecord("html")?.entries).toEqual([
       { url: "/artifact/html/page2.html" },
     ]);
+  });
+
+  // spec: proofs/arch/artifact-frame/artifact-bridge.md#^ab-ac-external-policy-host
+  it("derives external link policy from artifact kind rather than guest pathname", async () => {
+    window.history.replaceState(null, "", "/?mode=electron");
+    for (const artifact of [
+      { id: "policy-path", kind: "path" as const, title: "Path", path: "/tmp/site.html" },
+      { id: "policy-url", kind: "url" as const, title: "URL", url: "https://remote.test/artifact/01ARZ3NDEKTSV4RRFFQ69G5FAV/index.html" },
+    ]) {
+      const el = mount(artifact);
+      await flush();
+      const webview = el.querySelector<HTMLElement>("webview.artifact-content")!;
+      const send = vi.fn();
+      Object.assign(webview, { send });
+      dispatchWebviewIpc(webview, { type: "bridge-ready", guid: `policy-${artifact.id}` });
+      expect(send).toHaveBeenCalledWith("television-artifact-bridge", {
+        type: "external-link-policy",
+        openExternalWebLinks: artifact.kind === "path",
+        sourceOrigin: window.location.origin,
+      });
+    }
   });
 
   it("returns directly to the document and clears browsing history", async () => {

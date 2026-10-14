@@ -39,6 +39,7 @@ export {
   type BridgeLeavingNotification,
   type BridgeMessage,
   type BridgeReadyNotification,
+  type ExternalLinkPolicyNotification,
   type ProxyContentChangedNotification,
   type NavigationKey,
   type NavigationKeyChordInput,
