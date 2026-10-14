@@ -255,7 +255,7 @@ describe("Electron e2e environment planning", () => {
   test("wraps Playwright with Xvfb only when the plan requests it", () => {
     expect(getElectronE2EInvocation({ useXvfb: true }, ["smoke.test.ts"])).toEqual({
       command: "xvfb-run",
-      args: ["-a", "npx", "playwright", "test", "--config=packages/desktop/playwright.config.ts", "smoke.test.ts"],
+      args: ["-a", "-s", "-screen 0 3200x2400x24", "npx", "playwright", "test", "--config=packages/desktop/playwright.config.ts", "smoke.test.ts"],
     });
     expect(getElectronE2EInvocation({ useXvfb: false })).toEqual({
       command: "npx",
