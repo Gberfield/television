@@ -295,6 +295,10 @@ After the upgrade, open browser tabs reload themselves once when they reconnect;
 - **Listen addresses.** If `listen` holds a Tailscale or LAN address, check it is still this machine's address (section 2). If the set of addresses changes, the person may lose a way of reaching Television; tell them.
 - **`installedByAgent`.** If it is unset, set it (section 5).
 
+#### Artifacts that use browser storage
+
+Television 1.5.0 improved artifact security, and artifacts can no longer use browser storage (`localStorage`, `sessionStorage`, cookies, IndexedDB); what they saved there before can't be carried over. On an upgrade from an earlier version, check the HTML artifacts (`tv list-artifacts`) for those, and decide for each what to recommend: remove the saving, or move it to the artifact's JSON store (see the `television` skill). Tell the person in plain words, without technical terms, that improved security in Television changes how artifacts save data, which of their artifacts are affected, and how each will behave after the change.
+
 #### Moving from the npm desktop app to the downloaded app
 
 Desktop apps up to Television 1.3 were installed with the npm package `@telepath-computer/television-desktop` and started with `tv-desktop`. That package gets no more updates. A small number of people still use it. The downloaded app replaces it and keeps its saved server connection, so the person doesn't need to reconnect.
@@ -407,6 +411,7 @@ Work out, without involving the person:
 - **Where the skills are installed** (section 7).
 - **The settings the service will use**: work through the settings checks in section 7.
 - **An npm desktop app** installed on this machine (section 7).
+- **Artifacts that use browser storage**, if the installed version is earlier than 1.5.0 (section 7).
 
 ### 2. Confirm
 
@@ -415,7 +420,8 @@ Send one message, in plain words:
 - what you're about to do: upgrade Television from the installed version to the new one, and update its skills; Television will be unavailable for a few seconds and open windows reconnect by themselves;
 - in the rare cases where section 7 says the person's connection changes, that they'll need a new link;
 - anything that needs their decision, such as an outdated Node version;
-- if you found the npm desktop app on this machine, an offer to move them to the downloaded app.
+- if you found the npm desktop app on this machine, an offer to move them to the downloaded app;
+- if you found artifacts that use browser storage, what section 7 says to tell them.
 
 No telemetry notice. Then wait for their go-ahead.
 
@@ -426,12 +432,14 @@ No telemetry notice. Then wait for their go-ahead.
 3. Fix the settings you found in the check (section 7), then run `tv serve --persist`.
 4. Verify the running version matches the installed one (section 7).
 5. In the rare case that the person needs a new link (section 7), get it from `tv links` and verify it exactly as section 3 requires.
+6. If you found artifacts that use browser storage, change them as you said you would (section 7).
 
 ### 4. Report
 
 One short message: Television is upgraded, and to which version. Add only what the person needs to act on:
 
 - the steps to move off the npm desktop app, if that applies (section 7);
+- the artifacts you changed because they used browser storage, if any (section 7);
 - in the rare case they need a new connect link (section 7), the link, complete and verified, with how to use it: open it in a browser, or in the desktop app choose **Television › Disconnect from Server** and paste it; and that they can get it again by asking you or running `tv links` on this machine.
 
 ## Read this guide in full

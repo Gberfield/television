@@ -13,6 +13,12 @@ import {
 import { Server } from "../src/server.ts";
 import { createServingStore } from "../../../test/helpers/serving-store.ts";
 
+// Artifact IDs are generated (specs/product/artifacts.md#^af-artifact-id), so
+// these tests name artifacts and map each name to the ID its fixture created.
+let ids: Record<string, string> = {};
+const id = (name: string): string => ids[name] ?? name;
+const named = (layout: TabPage[]): TabPage[] => layout.map((p) => ({ ...p, artifactIds: p.artifactIds.map(id) }));
+
 // Proves the move contract in specs/arch/layout/index.md#^ly-move
 // (proofs/arch/layout/index.md, "Moving an artifact between channels").
 
@@ -58,7 +64,8 @@ function createFixture(): Fixture {
   const source = store.createChannel({ id: "source-channel", name: "Source" });
   const target = store.createChannel({ id: "target-channel", name: "Target" });
   const authored = store.createChannel({ id: "authored-channel", name: "Authored" });
-  for (const [id, channelID] of [
+  ids = {};
+  for (const [name, channelID] of [
     ["source-before", source.id],
     ["moved", source.id],
     ["source-other", source.id],
@@ -70,9 +77,9 @@ function createFixture(): Fixture {
     ["authored-d", authored.id],
     ["authored-c", authored.id],
   ] as const) {
-    store.createArtifact({ id, kind: "url", title: id, channelID, url: `https://example.com/${id}` });
+    ids[name] = store.createArtifact({ kind: "url", title: name, channelID, url: `https://example.com/${name}` }).id;
   }
-  store.updateChannel({ channelID: source.id, fields: { layout: SOURCE_BEFORE } });
+  store.updateChannel({ channelID: source.id, fields: { layout: named(SOURCE_BEFORE) } });
   store.dispose();
 
   writeFileSync(
@@ -81,7 +88,7 @@ function createFixture(): Fixture {
       id: authored.id,
       name: authored.name,
       layoutVersion: LAYOUT_VERSION,
-      layout: [page(["authored-a", "authored-b", "authored-d"], false, MOVED_SIZE), page(["authored-c"])],
+      layout: named([page(["authored-a", "authored-b", "authored-d"], false, MOVED_SIZE), page(["authored-c"])]),
     }, null, 2),
   );
 
@@ -172,7 +179,7 @@ describe("moving an artifact between channels", () => {
   }
 
   function move(server: Server, token: string, artifactID: string, channelID: string) {
-    return request(server.httpServer).post(`/artifacts/${artifactID}/move`).set(auth(token)).send({ channelID });
+    return request(server.httpServer).post(`/artifacts/${id(artifactID)}/move`).set(auth(token)).send({ channelID });
   }
 
   // proofs/arch/layout/index.md#^ly-ac-move
@@ -182,31 +189,31 @@ describe("moving an artifact between channels", () => {
     const ws = await openEvents(first.server, first.token);
     const sourceEvent = nextChannelUpdate(ws, fx.source);
     const targetEvent = nextChannelUpdate(ws, fx.target);
-    const before = (await request(first.server.httpServer).get("/artifacts/moved").set(auth(first.token)).expect(200)).body.artifact;
+    const before = (await request(first.server.httpServer).get(`/artifacts/${id("moved")}`).set(auth(first.token)).expect(200)).body.artifact;
     const inodes = () => [fx.source, fx.target].map((id) => statSync(channelPath(fx.storagePath, id)).ino);
     const inodesBefore = inodes();
 
     await move(first.server, first.token, "moved", fx.target)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ outcome: "moved", artifactID: "moved", channelID: fx.target }));
+      .expect(({ body }) => expect(body).toEqual({ outcome: "moved", artifactID: id("moved"), channelID: fx.target }));
 
-    expect((await sourceEvent).channel.layout).toEqual(SOURCE_AFTER);
-    expect((await targetEvent).channel.layout).toEqual(TARGET_AFTER);
+    expect((await sourceEvent).channel.layout).toEqual(named(SOURCE_AFTER));
+    expect((await targetEvent).channel.layout).toEqual(named(TARGET_AFTER));
     ws.close();
     // Each channel's record was replaced by a new file rather than rewritten
     // in place, so a stop mid-save leaves the old record or the new one.
     const inodesAfter = inodes();
     expect(inodesAfter[0]).not.toBe(inodesBefore[0]);
     expect(inodesAfter[1]).not.toBe(inodesBefore[1]);
-    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(SOURCE_AFTER);
-    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(TARGET_AFTER);
-    await request(first.server.httpServer).get("/artifacts/moved").set(auth(first.token)).expect(200)
+    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(named(SOURCE_AFTER));
+    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(named(TARGET_AFTER));
+    await request(first.server.httpServer).get(`/artifacts/${id("moved")}`).set(auth(first.token)).expect(200)
       .expect(({ body }) => expect(body.artifact).toEqual(before));
 
     await stop(first.server);
     const restarted = await start(fx);
-    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(SOURCE_AFTER);
-    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(TARGET_AFTER);
+    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(named(SOURCE_AFTER));
+    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(named(TARGET_AFTER));
   });
 
   // proofs/arch/layout/index.md#^ly-ac-move-multi
@@ -216,11 +223,11 @@ describe("moving an artifact between channels", () => {
 
     await move(server, token, "authored-b", fx.target).expect(200);
 
-    expect(await layoutOf(server, token, fx.authored)).toEqual([
+    expect(await layoutOf(server, token, fx.authored)).toEqual(named([
       page(["authored-a", "authored-d"], false, MOVED_SIZE),
       page(["authored-c"]),
-    ]);
-    expect(await layoutOf(server, token, fx.target)).toEqual([...TARGET_BEFORE, page(["authored-b"], false, MOVED_SIZE)]);
+    ]));
+    expect(await layoutOf(server, token, fx.target)).toEqual(named([...TARGET_BEFORE, page(["authored-b"], false, MOVED_SIZE)]));
   });
 
   // proofs/arch/layout/index.md#^ly-ac-move-same
@@ -231,9 +238,9 @@ describe("moving an artifact between channels", () => {
 
     await move(server, token, "moved", fx.source)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: "moved", channelID: fx.source }));
+      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: id("moved"), channelID: fx.source }));
 
-    expect(await layoutOf(server, token, fx.source)).toEqual(SOURCE_BEFORE);
+    expect(await layoutOf(server, token, fx.source)).toEqual(named(SOURCE_BEFORE));
     expect(readFileSync(channelPath(fx.storagePath, fx.source))).toEqual(storedBefore);
   });
 
@@ -250,8 +257,8 @@ describe("moving an artifact between channels", () => {
       .expect(404)
       .expect(({ body }) => expect(body.error).toBe(message));
 
-    expect(await layoutOf(server, token, fx.source)).toEqual(SOURCE_BEFORE);
-    expect(await layoutOf(server, token, fx.target)).toEqual(TARGET_BEFORE);
+    expect(await layoutOf(server, token, fx.source)).toEqual(named(SOURCE_BEFORE));
+    expect(await layoutOf(server, token, fx.target)).toEqual(named(TARGET_BEFORE));
     expect([fx.source, fx.target].map((id) => readFileSync(channelPath(fx.storagePath, id)))).toEqual(storedBefore);
   });
 
@@ -265,42 +272,42 @@ describe("moving an artifact between channels", () => {
     const response = await move(first.server, first.token, "moved", fx.target);
     expect(response.status).toBeGreaterThanOrEqual(500);
 
-    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(SOURCE_BEFORE);
-    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(TARGET_BEFORE);
+    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(named(SOURCE_BEFORE));
+    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(named(TARGET_BEFORE));
     expect(readFileSync(channelPath(fx.storagePath, fx.target))).toEqual(targetBefore);
     unblock();
 
     await stop(first.server);
     const restarted = await start(fx);
-    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(SOURCE_BEFORE);
-    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(TARGET_BEFORE);
+    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(named(SOURCE_BEFORE));
+    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(named(TARGET_BEFORE));
   });
 
   // proofs/arch/layout/index.md#^ly-ac-move-target-fails
   it("leaves the artifact on no channel, with its record kept, when the target channel cannot be saved", async () => {
     const fx = fixture();
     const first = await start(fx);
-    const before = (await request(first.server.httpServer).get("/artifacts/moved").set(auth(first.token)).expect(200)).body.artifact;
+    const before = (await request(first.server.httpServer).get(`/artifacts/${id("moved")}`).set(auth(first.token)).expect(200)).body.artifact;
     const unblock = blockFile(channelPath(fx.storagePath, fx.target));
 
     const response = await move(first.server, first.token, "moved", fx.target);
     expect(response.status).toBeGreaterThanOrEqual(500);
 
-    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(SOURCE_AFTER);
-    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(TARGET_BEFORE);
-    expect(storedLayout(fx.storagePath, fx.source)).toEqual(SOURCE_AFTER);
+    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(named(SOURCE_AFTER));
+    expect(await layoutOf(first.server, first.token, fx.target)).toEqual(named(TARGET_BEFORE));
+    expect(storedLayout(fx.storagePath, fx.source)).toEqual(named(SOURCE_AFTER));
     unblock();
 
     await stop(first.server);
     const restarted = await start(fx);
-    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(SOURCE_AFTER);
-    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(TARGET_BEFORE);
-    await request(restarted.server.httpServer).get("/artifacts/moved").set(auth(restarted.token)).expect(200)
+    expect(await layoutOf(restarted.server, restarted.token, fx.source)).toEqual(named(SOURCE_AFTER));
+    expect(await layoutOf(restarted.server, restarted.token, fx.target)).toEqual(named(TARGET_BEFORE));
+    await request(restarted.server.httpServer).get(`/artifacts/${id("moved")}`).set(auth(restarted.token)).expect(200)
       .expect(({ body }) => expect(body.artifact).toEqual(before));
     // An artifact on no channel cannot be moved, and is reported as no
     // channel holding it.
     await move(restarted.server, restarted.token, "moved", fx.target)
       .expect(404)
-      .expect(({ body }) => expect(body.error).toBe("Artifact not found: moved"));
+      .expect(({ body }) => expect(body.error).toBe(`Artifact not found: ${id("moved")}`));
   });
 });

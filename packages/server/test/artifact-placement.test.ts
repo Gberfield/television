@@ -13,6 +13,14 @@ import {
 import { Server } from "../src/server.ts";
 import { createServingStore } from "../../../test/helpers/serving-store.ts";
 
+// Artifact IDs are generated (specs/product/artifacts.md#^af-artifact-id), so
+// these tests name artifacts and map each name to the ID its fixture created.
+let ids: Record<string, string> = {};
+const id = (name: string): string => ids[name] ?? name;
+const named = (layout: TabPage[]): TabPage[] => layout.map((p) => ({ ...p, artifactIds: p.artifactIds.map(id) }));
+const namedPlacement = (placement: Record<string, string>) =>
+  Object.fromEntries(Object.entries(placement).map(([key, name]) => [key, id(name)]));
+
 // Proves the placement contract in specs/arch/layout/index.md#^ly-placement
 // (proofs/arch/layout/index.md, "Placing a page before or after an artifact").
 
@@ -46,16 +54,17 @@ function createFixture(): Fixture {
   const store = createServingStore(storagePath);
   const source = store.createChannel({ id: "source-channel", name: "Source" });
   const target = store.createChannel({ id: "target-channel", name: "Target" });
-  for (const [id, channelID] of [
+  ids = {};
+  for (const [name, channelID] of [
     ["moved", source.id],
     ["source-other", source.id],
     ["target-a", target.id],
     ["target-b", target.id],
     ["target-c", target.id],
   ] as const) {
-    store.createArtifact({ id, kind: "url", title: id, channelID, url: `https://example.com/${id}` });
+    ids[name] = store.createArtifact({ kind: "url", title: name, channelID, url: `https://example.com/${name}` }).id;
   }
-  store.updateChannel({ channelID: source.id, fields: { layout: SOURCE_BEFORE } });
+  store.updateChannel({ channelID: source.id, fields: { layout: named(SOURCE_BEFORE) } });
   store.dispose();
   return { storagePath, source: source.id, target: target.id };
 }
@@ -131,11 +140,11 @@ describe("placing a page before or after an artifact", () => {
     return request(server.httpServer)
       .post("/artifacts")
       .set(auth(token))
-      .send({ kind: "url", title: "Placed", url: "https://example.com/placed", channelID, ...placement });
+      .send({ kind: "url", title: "Placed", url: "https://example.com/placed", channelID, ...namedPlacement(placement) });
   }
 
   function move(server: Server, token: string, artifactID: string, channelID: string, placement: Record<string, string>) {
-    return request(server.httpServer).post(`/artifacts/${artifactID}/move`).set(auth(token)).send({ channelID, ...placement });
+    return request(server.httpServer).post(`/artifacts/${id(artifactID)}/move`).set(auth(token)).send({ channelID, ...namedPlacement(placement) });
   }
 
   // proofs/arch/layout/index.md#^ly-ac-placement-create
@@ -151,9 +160,9 @@ describe("placing a page before or after an artifact", () => {
     const events = eventsUntilChannelUpdate(ws, fx.target);
 
     const created = await create(first.server, first.token, fx.target, placement).expect(201);
-    const id = created.body.artifact.id as string;
-    const expected = [...TARGET_BEFORE];
-    expected.splice(index, 0, page([id]));
+    const createdID = created.body.artifact.id as string;
+    const expected = named(TARGET_BEFORE);
+    expected.splice(index, 0, page([createdID]));
 
     const received = await events;
     ws.close();
@@ -175,18 +184,18 @@ describe("placing a page before or after an artifact", () => {
     const first = await start(fx);
     const ws = await openEvents(first.server, first.token);
     const events = eventsUntilChannelUpdate(ws, fx.target);
-    const expected = [...TARGET_BEFORE];
-    expected.splice(index, 0, page(["moved"], true, MOVED_SIZE));
+    const expected = named(TARGET_BEFORE);
+    expected.splice(index, 0, page([id("moved")], true, MOVED_SIZE));
 
     await move(first.server, first.token, "moved", fx.target, placement)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ outcome: "moved", artifactID: "moved", channelID: fx.target }));
+      .expect(({ body }) => expect(body).toEqual({ outcome: "moved", artifactID: id("moved"), channelID: fx.target }));
 
     const received = await events;
     ws.close();
     expect((received.at(-1) as Extract<ServerEvent, { type: "channel-updated" }>).channel.layout).toEqual(expected);
     expect(await layoutOf(first.server, first.token, fx.target)).toEqual(expected);
-    expect(await layoutOf(first.server, first.token, fx.source)).toEqual([page(["source-other"])]);
+    expect(await layoutOf(first.server, first.token, fx.source)).toEqual(named([page(["source-other"])]));
 
     await stop(first.server);
     const restarted = await start(fx);
@@ -195,13 +204,13 @@ describe("placing a page before or after an artifact", () => {
 
   // proofs/arch/layout/index.md#^ly-ac-placement-rejected
   it.each([
-    ["creation", "an artifact on another channel", { before: "source-other" }, "Artifact source-other is not on channel target-channel."],
-    ["creation", "an unknown artifact", { after: "no-such-artifact" }, "Artifact no-such-artifact is not on channel target-channel."],
+    ["creation", "an artifact on another channel", { before: "source-other" }, "source-other"],
+    ["creation", "an unknown artifact", { after: "no-such-artifact" }, "no-such-artifact"],
     ["creation", "both before and after", { before: "target-a", after: "target-b" }, null],
-    ["move", "an artifact on another channel", { before: "source-other" }, "Artifact source-other is not on channel target-channel."],
-    ["move", "an unknown artifact", { after: "no-such-artifact" }, "Artifact no-such-artifact is not on channel target-channel."],
+    ["move", "an artifact on another channel", { before: "source-other" }, "source-other"],
+    ["move", "an unknown artifact", { after: "no-such-artifact" }, "no-such-artifact"],
     ["move", "both before and after", { before: "target-a", after: "target-b" }, null],
-  ])("rejects a %s naming %s without changing anything", async (kind, _case, placement, message) => {
+  ])("rejects a %s naming %s without changing anything", async (kind, _case, placement, namedArtifact) => {
     const fx = fixture();
     const { server, token } = await start(fx);
     const storedBefore = [fx.source, fx.target].map((id) => readFileSync(channelPath(fx.storagePath, id)));
@@ -214,9 +223,9 @@ describe("placing a page before or after an artifact", () => {
       : await move(server, token, "moved", fx.target, placement);
 
     expect(response.status).toBe(400);
-    if (message !== null) expect(response.body.error).toBe(message);
-    expect(await layoutOf(server, token, fx.source)).toEqual(SOURCE_BEFORE);
-    expect(await layoutOf(server, token, fx.target)).toEqual(TARGET_BEFORE);
+    if (namedArtifact !== null) expect(response.body.error).toBe(`Artifact ${id(namedArtifact)} is not on channel ${fx.target}.`);
+    expect(await layoutOf(server, token, fx.source)).toEqual(named(SOURCE_BEFORE));
+    expect(await layoutOf(server, token, fx.target)).toEqual(named(TARGET_BEFORE));
     expect([fx.source, fx.target].map((id) => readFileSync(channelPath(fx.storagePath, id)))).toEqual(storedBefore);
     expect((await request(server.httpServer).get("/artifacts").set(auth(token)).expect(200)).body.artifacts).toEqual(artifactsBefore);
     expect(existsSync(recordsDir) ? readdirSync(recordsDir).sort() : []).toEqual(recordsBefore);
@@ -232,9 +241,9 @@ describe("placing a page before or after an artifact", () => {
     // the same-channel return would be rejected.
     await move(server, token, "target-c", fx.target, { before: "source-other" })
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: "target-c", channelID: fx.target }));
+      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: id("target-c"), channelID: fx.target }));
 
-    expect(await layoutOf(server, token, fx.target)).toEqual(TARGET_BEFORE);
+    expect(await layoutOf(server, token, fx.target)).toEqual(named(TARGET_BEFORE));
     expect(readFileSync(channelPath(fx.storagePath, fx.target))).toEqual(storedBefore);
   });
 });
