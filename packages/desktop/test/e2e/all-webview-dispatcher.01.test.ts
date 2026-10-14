@@ -241,6 +241,7 @@ test.describe("Electron all-webview dispatcher", () => {
     const artifactID = await createPathArtifact(server, filePath);
     const { app, page } = await launchApp(server);
     try {
+      await expect(page.locator(".artifact-view webview.artifact-content")).toBeVisible({ timeout: 15_000 });
       await expect.poll(() => webviewText(app, "h1")).toBe("Local document");
       const initialURL = await webviewURL(app);
       await clickVisibleWebviewLink(app, page, "#external");
@@ -268,7 +269,13 @@ test.describe("Electron all-webview dispatcher", () => {
         await guest.executeJavaScript(`document.body.innerHTML = '<a id="cross-origin" href="${url}">Other site</a>'`);
       }, new URL(external.url).href.replace("127.0.0.1", "localhost"));
       const destination = external.url.replace("127.0.0.1", "localhost");
-      await clickVisibleWebviewLink(app, page, "#cross-origin");
+      const point = await app.evaluate(async ({ webContents }) => {
+        const guest = webContents.getAllWebContents().find((value) => value.getType() === "webview");
+        if (!guest) throw new Error("No webview found");
+        return await guest.executeJavaScript("(() => { const rect = document.querySelector('#cross-origin').getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()");
+      });
+      // A cross-document click replaces the gesture receipt with the destination.
+      await page.locator(".artifact-view webview.artifact-content").click({ position: point });
       await expect.poll(() => webviewURL(app)).toBe(destination);
       expect(await app.evaluate(() => {
         return (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog ?? [];
