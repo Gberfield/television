@@ -163,6 +163,27 @@ function runBuildExpectFailure(scriptPath: string, cwd: string): string {
 }
 
 describe("skills build", () => {
+  // proofs/arch/cli/index.md#^cli-t-skill-placement-wording
+  it("television skill describes placing artifacts before or after another without saying page", () => {
+    const skillsDistRoot = mkdtempSync(path.join(os.tmpdir(), "tv-skills-dist-"));
+    TEMP_DIRS.push(skillsDistRoot);
+    runBuild(path.join(REPO_ROOT, "packages", "skills", "scripts", "build.mjs"), REPO_ROOT, {
+      TV_SKILLS_DIST_DIR: skillsDistRoot,
+    });
+    const televisionSkill = readDistFile(skillsDistRoot, "television", "SKILL.md");
+    const start = televisionSkill.indexOf("## Channel placement");
+    const end = televisionSkill.indexOf("### Choosing the right channel");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const guidance = televisionSkill.slice(start, end);
+
+    expect(guidance).toContain("A created or moved artifact goes at the end of the channel's order unless you name a neighbour");
+    expect(guidance).toContain("`--before <artifact-id>` puts it immediately to the left of that artifact, and `--after <artifact-id>` immediately to its right");
+    expect(guidance).toContain("use `tv reposition-artifact` to change its place there");
+    expect(guidance).toContain("- `--before <artifact-id>` or `--after <artifact-id>` — put the artifact immediately left or right of another artifact on its channel");
+    expect(guidance).not.toMatch(/\bpages?\b/i);
+  });
+
   it("builds the manifest collection with television theming guidance and specialist artifacts", () => {
     const skillsDistRoot = mkdtempSync(path.join(os.tmpdir(), "tv-skills-dist-"));
     TEMP_DIRS.push(skillsDistRoot);

@@ -4,6 +4,7 @@ import type {
   ArtifactPatch,
   CreateArtifactResult,
   MoveArtifactResult,
+  ArtifactPlacement,
   DeleteArtifactResult,
   DisplayPatch,
   DisplayState,
@@ -311,7 +312,7 @@ export class ArtifactClient {
   }
 
   /** Create an artifact on a channel in one round trip. */
-  create(input: ({ channelID: string } & NewArtifact)): Promise<CreateArtifactResult> {
+  create(input: ({ channelID: string } & NewArtifact & ArtifactPlacement)): Promise<CreateArtifactResult> {
     const body: Record<string, unknown> = {
       kind: input.kind,
       title: input.title,
@@ -325,6 +326,8 @@ export class ArtifactClient {
         break;
     }
     body.channelID = input.channelID;
+    if (input.before !== undefined) body.before = input.before;
+    if (input.after !== undefined) body.after = input.after;
     return this.#http.requestJSON<CreateArtifactResult>("POST", "/artifacts", body);
   }
 
@@ -373,11 +376,15 @@ export class ArtifactClient {
   }
 
   /** Move an artifact to another channel (specs/arch/layout/index.md#^ly-move). */
-  move(input: { artifactID: string; channelID: string }): Promise<MoveArtifactResult> {
+  move(input: { artifactID: string; channelID: string } & ArtifactPlacement): Promise<MoveArtifactResult> {
     return this.#http.requestJSON<MoveArtifactResult>(
       "POST",
       `/artifacts/${encodeURIComponent(input.artifactID)}/move`,
-      { channelID: input.channelID },
+      {
+        channelID: input.channelID,
+        ...(input.before !== undefined ? { before: input.before } : {}),
+        ...(input.after !== undefined ? { after: input.after } : {}),
+      },
     );
   }
 }

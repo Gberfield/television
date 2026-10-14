@@ -117,7 +117,9 @@ These are illustrative, not exhaustive. When the language is ambiguous or unusua
 
 ## Channel placement
 
-Artifact creation commands require `--channel` because new artifacts need immediate channel membership. `tv move-artifact --id <id> --channel <target> (--focus-artifact|--no-focus)` moves an existing artifact to another channel. It stays the same artifact, so its ID, its store, and its share link keep working, and it becomes the last artifact in the target channel's order, at the size and full-screen state it had. Creating a second artifact with the same `--path` or `--url` on the other channel instead shows the content in both places, as two artifacts with separate stores.
+Artifact creation commands require `--channel` because new artifacts need immediate channel membership. `tv move-artifact --id <id> --channel <target> (--focus-artifact|--no-focus)` moves an existing artifact to another channel. It stays the same artifact, so its ID, its store, and its share link keep working, and it keeps the size and full-screen state it had. Creating a second artifact with the same `--path` or `--url` on the other channel instead shows the content in both places, as two artifacts with separate stores.
+
+A created or moved artifact goes at the end of the channel's order unless you name a neighbour: `--before <artifact-id>` puts it immediately to the left of that artifact, and `--after <artifact-id>` immediately to its right. Use at most one of the two. The named artifact must already be on that channel; otherwise nothing changes and the command reports an error. Moving an artifact to the channel it is already on changes nothing, even with `--before` or `--after`; use `tv reposition-artifact` to change its place there.
 
 Think carefully about whether the user means:
 
@@ -138,6 +140,9 @@ A channel shows its artifacts left to right, in the order of its tabs. `tv get-c
 - `--width <px>` and `--height <px>` — the artifact's size
 - `--full-screen` or `--no-full-screen` — whether the artifact fills the stage; leaving full-screen returns the artifact to its size
 - `--position <n>` — where the artifact sits in the order, counting from 1 at the left
+- `--before <artifact-id>` or `--after <artifact-id>` — put the artifact immediately left or right of another artifact on its channel. To move it one step, use `--before` with the artifact now on its left, or `--after` with the artifact now on its right; `tv get-channel` shows the order.
+
+Use at most one of `--position`, `--before`, and `--after`.
 
 Sizes are reference pixels, not screen pixels: the size the artifact shows at when the stage is 1280 by 800. On a larger or smaller window, every artifact grows or shrinks by the same partial factor, never in full proportion, and an artifact is never shown larger than the stage. A new artifact starts at 760 by 770. To make artifacts bigger or smaller relative to each other, change their sizes by the same ratio you want them to appear in; to fill the stage, use `--full-screen` rather than a large size.
 

@@ -19,6 +19,7 @@ export {
   type InstalledTheme,
   type LayoutNode,
   type MoveArtifactResult,
+  type ArtifactPlacement,
   type OnboardingChannelMarker,
   type PageSize,
   type ResourceEventMessage,

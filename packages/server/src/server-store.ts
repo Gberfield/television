@@ -17,6 +17,7 @@ import {
   ThemeChangedEvent,
   type ArtifactRemovalResult,
   type MoveArtifactResult,
+  type ArtifactPlacement,
   type StoreDomainEvent,
   type ChannelRemovalResult,
   type ThemeRegistrySnapshot,
@@ -439,21 +440,21 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     channelID: string;
     path?: string;
     url?: string;
-  }, telemetryContext?: TelemetryClientContext | null): Artifact {
-    const channel = this.requireChannel(input.channelID);
-    const created = this.createKindArtifact({ ...input, id: input.id ?? this.newID() });
+  } & ArtifactPlacement, telemetryContext?: TelemetryClientContext | null): Artifact {
+    const { before, after, ...fields } = input;
+    const channel = this.requireChannel(fields.channelID);
+    const created = this.createKindArtifact({ ...fields, id: fields.id ?? this.newID() });
     const previousLayout = channel.layout;
+    // Checked before the record is saved, so a rejected placement saves nothing.
+    const nextLayout = placePage(
+      channel,
+      { artifactIds: [created.id], geometry: { ...DEFAULT_PAGE_GEOMETRY }, size: { ...DEFAULT_PAGE_SIZE } },
+      { before, after },
+    );
 
     const saved = this.saveArtifactRecord(created, `creating artifact ${created.id}`);
     const artifact = saved.artifact;
-    channel.layout = [
-      ...channel.layout,
-      {
-        artifactIds: [artifact.id],
-        geometry: { ...DEFAULT_PAGE_GEOMETRY },
-        size: { ...DEFAULT_PAGE_SIZE },
-      },
-    ];
+    channel.layout = nextLayout;
     try {
       this.persistChannel(channel);
     } catch (error) {
@@ -466,6 +467,10 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     this.artifactChannels.set(artifact.id, channel.id);
     this.startWatchingArtifactContent(artifact);
     this.dispatchEvent(new ArtifactCreatedEvent("artifact-created", { channelID: channel.id, artifact }));
+    // Clients add a created artifact at the end; the update carries its place.
+    if (before !== undefined || after !== undefined) {
+      this.dispatchEvent(new ChannelUpdatedEvent("channel-updated", { channel }));
+    }
     this.emitTelemetry((hooks) => hooks.artifactCreated(artifact, telemetryContext));
 
     if (saved.uncertain !== null) throw saved.uncertain;
@@ -873,7 +878,7 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
    * target. A failed target save, like a stop between the two, leaves the
    * artifact on no channel; that risk is accepted to keep a move simple.
    */
-  moveArtifact(input: { artifactID: string; channelID: string }): MoveArtifactResult {
+  moveArtifact(input: { artifactID: string; channelID: string } & ArtifactPlacement): MoveArtifactResult {
     const { artifactID } = input;
     if (!this._artifacts.has(artifactID)) {
       throw new NotFoundError(`Artifact not found: ${artifactID}`, { entityType: "artifact", entityID: artifactID });
@@ -887,6 +892,12 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     }
     const source = this.requireChannel(sourceID);
     const page = source.layout.find((candidate) => candidate.artifactIds.includes(artifactID))!;
+    // Checked before the source save, so a rejected placement changes nothing.
+    const nextTargetLayout = placePage(
+      target,
+      { artifactIds: [artifactID], geometry: structuredClone(page.geometry), size: { ...page.size } },
+      input,
+    );
 
     const previousSourceLayout = source.layout;
     source.layout = removeArtifactFromPages(source.layout, artifactID);
@@ -900,10 +911,7 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     this.dispatchEvent(new ChannelUpdatedEvent("channel-updated", { channel: source }));
 
     const previousTargetLayout = target.layout;
-    target.layout = [
-      ...target.layout,
-      { artifactIds: [artifactID], geometry: structuredClone(page.geometry), size: { ...page.size } },
-    ];
+    target.layout = nextTargetLayout;
     try {
       this.persistChannel(target, { atomically: true });
     } catch (error) {
@@ -1844,4 +1852,22 @@ function storeOf(artifact: Artifact | undefined): string | undefined {
 
 function shareOf(artifact: Artifact | undefined): ArtifactShareLink | undefined {
   return artifact?.kind === "path" ? artifact.share : undefined;
+}
+
+/**
+ * The channel's layout with `page` added immediately before or after the page
+ * holding a named artifact, or at the end when no placement is given
+ * (specs/arch/layout/index.md#^ly-placement).
+ */
+function placePage(channel: Channel, page: TabPage, placement: ArtifactPlacement): TabPage[] {
+  const { before, after } = placement;
+  if (before !== undefined && after !== undefined) {
+    throw new InvalidRequestError("Give at most one of before or after");
+  }
+  const named = before ?? after;
+  if (named === undefined) return [...channel.layout, page];
+  const index = channel.layout.findIndex((candidate) => candidate.artifactIds.includes(named));
+  if (index === -1) throw new InvalidRequestError(`Artifact ${named} is not on channel ${channel.id}.`);
+  const at = before !== undefined ? index : index + 1;
+  return [...channel.layout.slice(0, at), page, ...channel.layout.slice(at)];
 }

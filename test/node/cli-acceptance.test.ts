@@ -660,6 +660,47 @@ describe("CLI product spine acceptance", () => {
     expect(result.stderr).toContain("Television ships bundled skills.");
     expect(await layout(source.id)).toEqual(before);
   });
+  // Spec: [[product/cli.md#^cli-ac-before-after|placement acceptance]].
+  it("create, move, and reposition place artifacts before or after another through the built CLI and real server", async () => {
+    const { api, channel, layout, tv } = await seededServer("television-cli-acceptance-before-after-");
+    const home = await channel("Home", 2);
+    const other = await channel("Other", 1);
+    const [a, b] = home.artifactIDs as [string, string];
+    const x = other.artifactIDs[0]!;
+    const order = async () =>
+      (JSON.parse((await tv(["get-channel", "--channel", home.id])).stdout).channel.layout as Array<{ artifactIds: string[] }>)
+        .map((page) => page.artifactIds[0]);
+
+    const created = await tv([
+      "create-url-artifact", "--channel", home.id, "--title", "New", "--url", "https://example.com/new", "--after", a, "--no-focus",
+    ]);
+    expect(created.exitCode).toBe(0);
+    const added = /URL artifact (\S+) created\./.exec(created.stdout)![1]!;
+    expect(await order()).toEqual([a, added, b]);
+
+    expect((await tv(["move-artifact", "--id", x, "--channel", home.id, "--before", a, "--no-focus"])).exitCode).toBe(0);
+    expect(await order()).toEqual([x, a, added, b]);
+
+    expect((await tv(["reposition-artifact", "--id", b, "--before", x])).exitCode).toBe(0);
+    expect(await order()).toEqual([b, x, a, added]);
+
+    const target = path.join(makeTempDir("television-cli-acceptance-before-after-target-", dirs), "note.md");
+    writeFileSync(target, "# Note\n");
+    const otherAgain = await channel("Elsewhere", 1);
+    const elsewhere = otherAgain.artifactIDs[0]!;
+    const artifactsBefore = (await api("GET", "/artifacts")).artifacts;
+    const layoutBefore = await layout(home.id);
+    const rejected = await tv([
+      "create-path-artifact", "--channel", home.id, "--title", "Note", "--path", target, "--before", elsewhere, "--no-focus",
+    ]);
+    expect(rejected.exitCode).toBe(1);
+    expect(rejected.stdout).toBe("");
+    expect(rejected.stderr).toContain(`Artifact ${elsewhere} is not on channel ${home.id}.`);
+    expect(rejected.stderr).toContain("Television ships bundled skills.");
+    expect((await api("GET", "/artifacts")).artifacts).toEqual(artifactsBefore);
+    expect(await layout(home.id)).toEqual(layoutBefore);
+  });
+
   // Spec: [[product/cli.md#^cli-ac-directive-error|directive-error acceptance]].
   it("returns exit 1 and recovery guidance for a directive error", async () => {
     const result = await runBuiltCLI(["list-artifacts", "--bogus"]);
