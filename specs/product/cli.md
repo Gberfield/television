@@ -538,7 +538,7 @@ Channel <channel-id> changed before artifact <artifact-id> could be repositioned
 Artifact <named-artifact-id> is not on channel <channel-id>.
 ```
 
-The help, output, and errors of `tv reposition-artifact` and `tv move-artifact` speak of artifacts and their order and size. They do not say "page" or "tab page", which are internal terms. ^cli-arrangement-wording
+The help, output, and errors of `tv reposition-artifact` and `tv move-artifact`, the help and errors of `--before` and `--after` on the creation commands, and the bundled `television` skill's guidance for arranging, placing, and moving artifacts speak of artifacts and their order and size. They do not say "page" or "tab page", which are internal terms. ^cli-arrangement-wording
 
 `tv move-artifact --id <id> --channel <channel-id> [--before <artifact-id>|--after <artifact-id>] (--focus-artifact|--no-focus)` moves an artifact to another channel ([product/artifacts.md#^af-move](./artifacts.md#^af-move)). It goes at the end of that channel's order, or beside another artifact when `--before` or `--after` names one ([#^cli-before-after](#^cli-before-after)). Exactly one focus directive is required. `--focus-artifact` sends a transient artifact-focus nudge for the artifact after the move, which takes clients to its new channel; `--no-focus` leaves focus unchanged. Success prints: ^cli-move-artifact
 
