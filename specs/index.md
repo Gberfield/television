@@ -140,7 +140,7 @@ Generated from the first-line description of every spec by `scripts/specs-index.
     - **skill-selector/**
       - `index.md` (38 lines) — *UI spec: the skill selector — the navbar trigger and the skills popover; its interaction, markup, and styling.*
     - **stage/**
-      - `index.md` (135 lines) — *UI spec: the stage — the region artifacts are shown in, and the filmstrip of pages it holds.*
+      - `index.md` (136 lines) — *UI spec: the stage — the region artifacts are shown in, and the filmstrip of pages it holds.*
     - **system-modal/**
       - `index.md` (30 lines) — *UI spec: the system modal — the dialog that interrupts Television while it cannot use a server, its contents by state.*
     - **tab-strip/**
