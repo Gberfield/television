@@ -532,7 +532,7 @@ The command reads the channel and then sends its whole new arrangement. If an ar
 Channel <channel-id> changed before artifact <artifact-id> could be repositioned, so nothing changed. Run the command again.
 ```
 
-`--before <artifact-id>` places an artifact immediately before the named artifact in the channel's order, which is to its left, and `--after <artifact-id>` places it immediately after, to its right. The other artifacts keep their order. `tv create-path-artifact`, `tv create-url-artifact`, `tv move-artifact`, and `tv reposition-artifact` accept them, and each accepts at most one of the two. The named artifact must be on the channel the artifact is placed on: the `--channel` channel for the creation commands and `tv move-artifact`, and the artifact's own channel for `tv reposition-artifact`. When it is not, or no artifact has that ID, the command exits `1`, changes nothing, and prints this error before the standard bundled-skills recovery pointer: ^cli-before-after
+`--before <artifact-id>` places an artifact immediately before the named artifact in the channel's order, which is to its left, and `--after <artifact-id>` places it immediately after, to its right. The other artifacts keep their order. `tv create-path-artifact`, `tv create-url-artifact`, `tv move-artifact`, and `tv reposition-artifact` accept them, and each accepts at most one of the two. The named artifact must be on the channel the artifact is placed on: the `--channel` channel for the creation commands and `tv move-artifact`, and the artifact's own channel for `tv reposition-artifact`. `tv move-artifact` and `tv reposition-artifact` refuse to name the artifact being placed. When it is not, or no artifact has that ID, the command exits `1`, changes nothing, and prints this error before the standard bundled-skills recovery pointer: ^cli-before-after
 
 ```text
 Artifact <named-artifact-id> is not on channel <channel-id>.
@@ -546,11 +546,19 @@ The help, output, and errors of `tv reposition-artifact` and `tv move-artifact`,
 Artifact <artifact-id> moved to channel <channel-id>.
 ```
 
-When the artifact is already on that channel, nothing changes, and `--before` and `--after` are ignored; `tv reposition-artifact` changes its place in the order. The command still sends the nudge if `--focus-artifact` was given, and prints:
+When the artifact is already on that channel and `--before` or `--after` is given, the command moves it beside the named artifact in that channel's order, as `tv reposition-artifact` would, keeping its size and full-screen state. Success prints:
+
+```text
+Artifact <artifact-id> repositioned on channel <channel-id>.
+```
+
+When the artifact is already on that channel and neither option is given, or it is already in the named place, nothing changes. The command prints:
 
 ```text
 Artifact <artifact-id> is already on channel <channel-id>.
 ```
+
+In either case the command still sends the nudge if `--focus-artifact` was given.
 
 When `--channel` does not name a channel, the command exits `1`, changes nothing, and prints this error before the standard bundled-skills recovery pointer:
 
