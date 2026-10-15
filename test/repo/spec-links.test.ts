@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 
@@ -88,8 +89,31 @@ function relativeMirror(file: string, fromRoot: string, toRoot: string): string 
 function blockAnchorExists(file: string, anchor: string): boolean {
   if (!existsSync(file) || !statSync(file).isFile()) return false;
   const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![#\\w-])\\^${escaped}(?![\\w-])[ \\t]*$`, "m").test(readFileSync(file, "utf8"));
+  const pattern = new RegExp(`(?<![#\\w-])\\^${escaped}(?![\\w-])[ \\t]*$`, "m");
+  // Keep removed code from creating a line ending or joining neighboring prose.
+  return pattern.test(proseSegments(readFileSync(file, "utf8")).join("\0"));
 }
+
+describe("block reference target resolution", () => {
+  test.each([
+    ["real prose", "A statement. ^fixture-anchor\n", true],
+    ["backtick fenced example", "```text\nExample syntax. ^fixture-anchor\n```\n", false],
+    ["tilde fenced example", "~~~text\nExample syntax. ^fixture-anchor\n~~~\n", false],
+    ["inline example", "`Example syntax. ^fixture-anchor`\n", false],
+    ["real prose after a fenced example", "```text\nExample syntax. ^fixture-anchor\n```\n\nA real statement. ^fixture-anchor\n", true],
+    ["anchor before inline code on the same line", "A statement. ^fixture-anchor`inline code` continuation.\n", false],
+    ["missing anchor", "A statement with no block reference.\n", false],
+  ] as const)("resolves only prose anchors: %s", (_label, source, expected) => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "tv-block-reference-"));
+    try {
+      const file = path.join(directory, "fixture.md");
+      writeFileSync(file, source);
+      expect(blockAnchorExists(file, "fixture-anchor")).toBe(expected);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("spec and proof reference integrity", () => {
   test("authority documents carry no wikilink syntax", () => {
