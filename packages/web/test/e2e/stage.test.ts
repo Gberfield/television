@@ -897,15 +897,23 @@ test.describe("stage remote reorder (^st-ac-remote-reorder)", () => {
     ["the selected page itself moving", ["artifact-a", "artifact-c", "artifact-b"]],
   ] as const) {
     test(`keeps the selected page selected and centred when ${label} arrives as a channel update`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.goto(FIXTURE);
-      await waitForStage(page);
+      await waitForStage(page, true);
       await settleStage(page);
       expect(Math.abs((await report(page)).selectedCenterOffset ?? Infinity)).toBeLessThan(1);
 
+      const observation = await startMotionObservation(page, ".stage");
       await page.evaluate((nextOrder) => {
         (window as unknown as { __stageFixture: { reorder(order: readonly string[]): void } }).__stageFixture.reorder(nextOrder);
       }, order);
+      const motion = await observation.settle();
       await settleStage(page);
+
+      // With real motion, the update plays neither the drag's displacement nor a selection crossing.
+      expect(motion.transitionEvents).toEqual([]);
+      expect(motion.animationEvents).toEqual([]);
+      expect(motion.webAnimations).toEqual([]);
 
       expect(await page.evaluate(() =>
         (window as unknown as { __stageFixture: { pageKeys(): string[] } }).__stageFixture.pageKeys()
