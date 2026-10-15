@@ -61,10 +61,20 @@ const createURLArtifactSchema = z
   })
   .strict();
 
-const createArtifactBodySchema = z.discriminatedUnion("kind", [
-  createPathArtifactSchema.extend({ channelID: z.string() }).strict(),
-  createURLArtifactSchema.extend({ channelID: z.string() }).strict(),
-]);
+// specs/arch/layout/index.md#^ly-placement
+const placementFields = { before: z.string().optional(), after: z.string().optional() };
+const ONE_PLACEMENT_MESSAGE = "Give at most one of before or after";
+
+const createArtifactBodySchema = z
+  .discriminatedUnion("kind", [
+    createPathArtifactSchema.extend({ channelID: z.string(), ...placementFields }).strict(),
+    createURLArtifactSchema.extend({ channelID: z.string(), ...placementFields }).strict(),
+  ])
+  .refine((value) => value.before === undefined || value.after === undefined, { message: ONE_PLACEMENT_MESSAGE });
+
+const moveArtifactBodySchema = z
+  .object({ channelID: z.string({ error: "channelID is required" }).min(1, "channelID is required"), ...placementFields })
+  .refine((value) => value.before === undefined || value.after === undefined, { message: ONE_PLACEMENT_MESSAGE });
 
 const patchArtifactSchema = z
   .object({
@@ -332,6 +342,20 @@ export function registerRoutes(
       res.json({ artifact });
     } catch (error) {
       handleStoreError(res, error, "Failed to update artifact");
+    }
+  });
+
+  // specs/arch/layout/index.md#^ly-move
+  app.post("/artifacts/:id/move", ...auth, (req: Request<{ id: string }>, res) => {
+    const parsed = moveArtifactBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, HTTP_BAD_REQUEST, parsed.error.issues[0]?.message ?? "Invalid request body");
+      return;
+    }
+    try {
+      res.json(store.moveArtifact({ artifactID: req.params.id, ...parsed.data }, telemetryContext(req)));
+    } catch (error) {
+      handleStoreError(res, error, "Failed to move artifact");
     }
   });
 

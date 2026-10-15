@@ -509,6 +509,8 @@ describe("CLI Slice 1 artifact command surface", () => {
       "create-url-artifact",
       "update-artifact",
       "delete-artifact",
+      "reposition-artifact",
+      "move-artifact",
       "get-artifact",
       "list-artifacts",
       "share-artifact",
@@ -697,7 +699,8 @@ describe("CLI Slice 1 artifact command surface", () => {
 
     const focusStdout = new BufferOutput();
     expect(await runCLI(["help", "focus-artifact"], fakeEnvironment({ stdout: focusStdout, stderr: new BufferOutput() }))).toBe(0);
-    expect(focusStdout.toString()).toMatch(/select\s+the artifact's tab page/);
+    expect(focusStdout.toString()).toMatch(/select\s+the artifact and switch/);
+    expect(focusStdout.toString()).not.toMatch(/\bpages?\b/i);
     expect(focusStdout.toString()).toMatch(/switch to its channel when needed/);
     expect(focusStdout.toString()).not.toMatch(/scroll|highlight/i);
 
@@ -2651,6 +2654,8 @@ const SERVER_COMMANDS: string[][] = [
   ["create-url-artifact", "--channel", "screen-1", "--title", "U", "--url", "https://example.com", "--no-focus"],
   ["update-artifact", "--id", "artifact-1", "--title", "T"],
   ["delete-artifact", "--id", "artifact-1"],
+  ["reposition-artifact", "--id", "artifact-1", "--width", "500"],
+  ["move-artifact", "--id", "artifact-1", "--channel", "screen-1", "--no-focus"],
   ["get-artifact", "--id", "artifact-1"],
   ["list-artifacts"],
   ["create-channel", "--name", "New", "--no-focus"],
@@ -3298,5 +3303,306 @@ describe("CLI homes and the config file", () => {
     const tokenless = onTerminal(false);
     expect(await runCLI(["--home", tokenlessHome, "serve", "--persist"], fakeEnvironment({ stdout: tokenless.stdout, stderr: new BufferOutput(), createDaemon: fakeDaemon().createDaemon, createClient: tokenless.createClient }))).toBe(0);
     expect(tokenless.stdout.toString()).toBe(`Television service installed.\nOpen Television:\n  ${link("http://127.0.0.1:32848")}\n`);
+  });
+});
+
+describe("page arrangement and moving commands", () => {
+  const size = { width: 760, height: 770 };
+  const page = (artifactIds: string[], fullScreen = false, pageSize = size) => ({
+    artifactIds,
+    geometry: { kind: "single" as const, full_screen: fullScreen },
+    size: { ...pageSize },
+  });
+  const channels = () => [
+    { id: "other-channel", name: "Other", layout: [page(["elsewhere"])] },
+    { id: "home-channel", name: "Home", layout: [page(["first"]), page(["middle", "companion"]), page(["last"], true)] },
+  ];
+
+  function arrange(overrides: Record<string, unknown> = {}) {
+    const stdout = new BufferOutput();
+    const stderr = new BufferOutput();
+    const base = fakeEnvironment().createClient!("", "") as any;
+    const client = {
+      ...base,
+      channels: {
+        ...base.channels,
+        list: vi.fn(async () => ({ channels: channels() })),
+        update: vi.fn(async (input: any) => ({ channel: { id: input.channelID, name: "Home", layout: input.layout } })),
+      },
+      artifacts: {
+        ...base.artifacts,
+        move: vi.fn(async (input: any) => ({ outcome: "moved", artifactID: input.artifactID, channelID: input.channelID })),
+      },
+      ...overrides,
+    };
+    const createClient = vi.fn(() => client);
+    return { stdout, stderr, client, env: fakeEnvironment({ stdout, stderr, createClient }) };
+  }
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-request
+  it.each([
+    ["--width", ["--width", "612.5"], [page(["first"]), page(["middle", "companion"], false, { width: 612.5, height: 770 }), page(["last"], true)]],
+    ["--height", ["--height", "400"], [page(["first"]), page(["middle", "companion"], false, { width: 760, height: 400 }), page(["last"], true)]],
+    ["--full-screen", ["--full-screen"], [page(["first"]), page(["middle", "companion"], true), page(["last"], true)]],
+    ["--position first", ["--position", "1"], [page(["middle", "companion"]), page(["first"]), page(["last"], true)]],
+    ["--position last", ["--position", "3"], [page(["first"]), page(["last"], true), page(["middle", "companion"])]],
+    ["--position unchanged", ["--position", "2"], [page(["first"]), page(["middle", "companion"]), page(["last"], true)]],
+  ])("reposition-artifact %s changes only that page and submits the channel's layout once", async (_name, options, expectedLayout) => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "middle", ...options], env)).toBe(0);
+    expect(client.channels.list).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledWith({ channelID: "home-channel", layout: expectedLayout });
+    expect(stdout.toString()).toBe("Artifact middle repositioned.\n");
+    expect(stderr.toString()).toBe("");
+  });
+
+  it("reposition-artifact --no-full-screen leaves full-screen without changing the size", async () => {
+    const { client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "last", "--no-full-screen"], env)).toBe(0);
+    expect(client.channels.update).toHaveBeenCalledWith({
+      channelID: "home-channel",
+      layout: [page(["first"]), page(["middle", "companion"]), page(["last"])],
+    });
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-invalid
+  it.each([
+    ["no change option", []],
+    ["both full-screen flags", ["--full-screen", "--no-full-screen"]],
+    ["a zero width", ["--width", "0"]],
+    ["a negative height", ["--height", "-5"]],
+    ["a non-numeric width", ["--width", "wide"]],
+    ["a non-finite height", ["--height", "Infinity"]],
+    ["position zero", ["--position", "0"]],
+    ["a negative position", ["--position", "-1"]],
+    ["a fractional position", ["--position", "1.5"]],
+    ["a non-numeric position", ["--position", "first"]],
+    ["a position beyond the page count", ["--position", "4"]],
+  ])("reposition-artifact rejects %s without updating", async (_name, options) => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "middle", ...options], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-not-found
+  it("reposition-artifact reports an artifact that no channel holds", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "nowhere", "--width", "500"], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain("Artifact not found: nowhere");
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-stale
+  it("reposition-artifact reports a channel that changed before its update", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    client.channels.update.mockRejectedValueOnce(new RequestError(
+      "Channel home-channel layout cannot add, remove, split, merge, or regroup page membership",
+      { serverURL: "http://localhost:43123", status: 409 },
+    ));
+    expect(await runCLI(["reposition-artifact", "--id", "middle", "--width", "500"], env)).toBe(1);
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(
+      "Channel home-channel changed before artifact middle could be repositioned, so nothing changed. Run the command again.",
+    );
+    expect(stderr.toString()).not.toMatch(/\bpages?\b/i);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-arrangement-wording
+  it("reposition-artifact and move-artifact help and messages do not say page", async () => {
+    const texts: string[] = [];
+    for (const argv of [["reposition-artifact", "--help"], ["help", "move-artifact"]]) {
+      const { stdout, env } = arrange();
+      expect(await runCLI(argv, env)).toBe(0);
+      texts.push(stdout.toString());
+    }
+    for (const options of [["--width", "500"], ["--position", "4"], []]) {
+      const { stdout, stderr, env } = arrange();
+      await runCLI(["reposition-artifact", "--id", "middle", ...options], env);
+      texts.push(stdout.toString(), stderr.toString());
+    }
+    const moved = arrange();
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", "--no-focus"], moved.env)).toBe(0);
+    texts.push(moved.stdout.toString());
+    const notOnChannel = arrange();
+    await runCLI(["reposition-artifact", "--id", "middle", "--before", "elsewhere"], notOnChannel.env);
+    texts.push(notOnChannel.stderr.toString());
+    for (const command of ["create-path-artifact", "create-url-artifact"]) {
+      const { stdout, env } = arrange();
+      expect(await runCLI([command, "--help"], env)).toBe(0);
+      const placementLines = stdout.toString().split("\n").filter((line) => /--(before|after)\b/.test(line));
+      expect(placementLines).toHaveLength(2);
+      texts.push(...placementLines);
+    }
+
+    expect(texts.join("\n")).toContain("reposition-artifact");
+    for (const text of texts) expect(text).not.toMatch(/\bpages?\b/i);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-move-artifact
+  it("move-artifact requires exactly one focus directive", async () => {
+    for (const options of [[], ["--focus-artifact", "--no-focus"]]) {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", ...options], env)).toBe(1);
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    }
+  });
+
+  it.each([
+    ["moved", "--no-focus", "Artifact middle moved to channel other-channel.\n", false],
+    ["moved", "--focus-artifact", "Artifact middle moved to channel other-channel.\n", true],
+    ["unchanged", "--no-focus", "Artifact middle is already on channel other-channel.\n", false],
+    ["unchanged", "--focus-artifact", "Artifact middle is already on channel other-channel.\n", true],
+    ["repositioned", "--no-focus", "Artifact middle repositioned on channel other-channel.\n", false],
+    ["repositioned", "--focus-artifact", "Artifact middle repositioned on channel other-channel.\n", true],
+  ])("move-artifact reports outcome %s with %s", async (outcome, directive, expected, focuses) => {
+    const { stdout, stderr, client, env } = arrange();
+    client.artifacts.move.mockResolvedValue({ outcome, artifactID: "middle", channelID: "other-channel" });
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", directive], env)).toBe(0);
+    expect(client.artifacts.move).toHaveBeenCalledTimes(1);
+    expect(client.artifacts.move).toHaveBeenCalledWith({ artifactID: "middle", channelID: "other-channel" });
+    if (focuses) expect(client.display.focus).toHaveBeenCalledWith({ artifactID: "middle" });
+    else expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe(expected);
+    expect(stderr.toString()).toBe("");
+  });
+
+  it.each([
+    "Channel not found: missing-channel",
+    "Artifact not found: missing-artifact",
+  ])("move-artifact prints the server's not-found message %s", async (message) => {
+    const { stdout, stderr, client, env } = arrange();
+    client.artifacts.move.mockRejectedValue(new RequestError(message, { serverURL: "http://localhost:43123", status: 404 }));
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "missing-channel", "--focus-artifact"], env)).toBe(1);
+    expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // Placement before or after another artifact (specs/product/cli.md#^cli-before-after).
+  const placementChannels = () => [
+    { id: "other-channel", name: "Other", layout: [page(["elsewhere"])] },
+    { id: "home-channel", name: "Home", layout: [page(["a"]), page(["b"]), page(["c"]), page(["d"])] },
+  ];
+
+  function arrangePlacement() {
+    const arranged = arrange();
+    arranged.client.channels.list.mockImplementation(async () => ({ channels: placementChannels() }));
+    return arranged;
+  }
+
+  const createArgs = {
+    "create-path-artifact": ["create-path-artifact", "--channel", "home-channel", "--title", "Note", "--path", "/notes/note.md", "--no-focus"],
+    "create-url-artifact": ["create-url-artifact", "--channel", "home-channel", "--title", "Link", "--url", "https://example.com", "--no-focus"],
+    "move-artifact": ["move-artifact", "--id", "middle", "--channel", "home-channel", "--no-focus"],
+  } as const;
+
+  // proofs/arch/cli/index.md#^cli-t-placement-request
+  it.each([
+    ["create-path-artifact", "--before", "before"],
+    ["create-path-artifact", "--after", "after"],
+    ["create-url-artifact", "--before", "before"],
+    ["create-url-artifact", "--after", "after"],
+    ["move-artifact", "--before", "before"],
+    ["move-artifact", "--after", "after"],
+  ] as const)("%s passes %s to the server", async (command, option, key) => {
+    const { stderr, client, env } = arrange();
+    expect(await runCLI([...createArgs[command], option, "b"], env)).toBe(0);
+    expect(stderr.toString()).toBe("");
+    const call = command === "move-artifact" ? client.artifacts.move : client.artifacts.create;
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(call.mock.calls[0][0]).toEqual(expect.objectContaining({ [key]: "b" }));
+    expect(call.mock.calls[0][0]).not.toHaveProperty(key === "before" ? "after" : "before");
+  });
+
+  it.each(["create-path-artifact", "create-url-artifact", "move-artifact"] as const)(
+    "%s without --before or --after sends neither",
+    async (command) => {
+      const { client, env } = arrange();
+      expect(await runCLI([...createArgs[command]], env)).toBe(0);
+      const call = command === "move-artifact" ? client.artifacts.move : client.artifacts.create;
+      expect(call.mock.calls[0][0]).not.toHaveProperty("before");
+      expect(call.mock.calls[0][0]).not.toHaveProperty("after");
+    },
+  );
+
+  it.each(["create-path-artifact", "create-url-artifact", "move-artifact"] as const)(
+    "%s rejects --before with --after without a client call",
+    async (command) => {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI([...createArgs[command], "--before", "a", "--after", "b"], env)).toBe(1);
+      expect(client.artifacts.create).not.toHaveBeenCalled();
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain("accepts --before or --after, not both.");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    },
+  );
+
+  it.each(["--before", "--after"])(
+    "move-artifact rejects %s naming the moved artifact without a client call",
+    async (option) => {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI(["move-artifact", "--id", "a", "--channel", "home-channel", option, "a", "--no-focus"], env)).toBe(1);
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain("tv move-artifact cannot place artifact a before or after itself; name another artifact.");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    },
+  );
+
+  it("create-url-artifact prints the server's placement error without focusing", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    const message = "Artifact elsewhere is not on channel home-channel.";
+    client.artifacts.create = vi.fn(async () => {
+      throw new RequestError(message, { serverURL: "http://localhost:43123", status: 400 });
+    });
+    const argv = ["create-url-artifact", "--channel", "home-channel", "--title", "Link", "--url", "https://example.com", "--before", "elsewhere", "--focus-artifact"];
+    expect(await runCLI(argv, env)).toBe(1);
+    expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-before-after
+  it.each([
+    ["b --after c", "b", ["--after", "c"], [page(["a"]), page(["c"]), page(["b"]), page(["d"])]],
+    ["b --before a", "b", ["--before", "a"], [page(["b"]), page(["a"]), page(["c"]), page(["d"])]],
+    ["c --after d", "c", ["--after", "d"], [page(["a"]), page(["b"]), page(["d"]), page(["c"])]],
+    ["c --before b", "c", ["--before", "b"], [page(["a"]), page(["c"]), page(["b"]), page(["d"])]],
+    ["b --before c, where it already is", "b", ["--before", "c"], [page(["a"]), page(["b"]), page(["c"]), page(["d"])]],
+    ["b --before d --width 500", "b", ["--before", "d", "--width", "500"], [page(["a"]), page(["c"]), page(["b"], false, { width: 500, height: 770 }), page(["d"])]],
+  ])("reposition-artifact %s places the artifact beside another", async (_name, id, options, expectedLayout) => {
+    const { stdout, stderr, client, env } = arrangePlacement();
+    expect(await runCLI(["reposition-artifact", "--id", id, ...options], env)).toBe(0);
+    expect(client.channels.update).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledWith({ channelID: "home-channel", layout: expectedLayout });
+    expect(stdout.toString()).toBe(`Artifact ${id} repositioned.\n`);
+    expect(stderr.toString()).toBe("");
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-placement-invalid
+  it.each([
+    ["--before with --after", ["--before", "a", "--after", "c"], null],
+    ["--position with --before", ["--position", "1", "--before", "a"], null],
+    ["--before naming itself", ["--before", "b"], null],
+    ["--before naming an artifact on another channel", ["--before", "elsewhere"], "Artifact elsewhere is not on channel home-channel."],
+    ["--after naming an artifact on no channel", ["--after", "nowhere"], "Artifact nowhere is not on channel home-channel."],
+  ])("reposition-artifact rejects %s placement without updating", async (_name, options, message) => {
+    const { stdout, stderr, client, env } = arrangePlacement();
+    expect(await runCLI(["reposition-artifact", "--id", "b", ...options], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    if (message !== null) expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
   });
 });

@@ -41,7 +41,7 @@ import type {
   DeleteArtifactResult,
   ChannelRemovalResult,
 } from "@telepath-computer/television-shared";
-import { TelevisionClient, ValidationError, buildConnectURL, type TelemetryStatus } from "@telepath-computer/television-shared";
+import { TelevisionClient, ValidationError, buildConnectURL, type ArtifactPlacement, type TabPage, type TelemetryStatus } from "@telepath-computer/television-shared";
 import {
   ACCESS_LEVELS,
   RESOURCE_BINDINGS_ENABLED,
@@ -120,6 +120,7 @@ const MAX_PROCESS_EXIT_STATUS = 255;
 const LOOPBACK_IPV4 = "127.0.0.1";
 const CONFIG_KEYS = ["port", "listen", "auth", "installedByAgent"] as const;
 const HTTP_UNAUTHORIZED_STATUS = 401;
+const HTTP_CONFLICT_STATUS = 409;
 const HELP_POINTER = "Television ships bundled skills. The main skill is `television` — keep its guidance available for channels, lifecycle, the `tv` CLI, artifact workflow, and theming. Re-read it only if it is not already in context or you know the installed skill changed. Additional `tv-*` skills cover specialized artifact types. Install all bundled skills with `tv skills install <path>` (e.g. ~/.openclaw/skills) or `tv skills install -i`.";
 export const PORT_ZERO_WARNING = "WARNING: config port 0 lets the operating system choose this server's port. Commands that contact this server must pass --port <port>, using the port in the startup output.";
 const TELEMETRY_NOTICE = "Fully anonymized telemetry is enabled by default. Opt out: tv telemetry disable.";
@@ -749,6 +750,37 @@ function copyBundledSkillsToDestination(bundledSkillsRoot: string, destinationRo
   return copied;
 }
 
+/** A width or height for `tv reposition-artifact`: a finite, positive number of reference pixels. */
+function parseArtifactDimension(option: "--width" | "--height", value: string): number {
+  const parsed = value.trim() === "" ? Number.NaN : Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw createDirectiveError(`tv reposition-artifact ${option} must be a finite, positive number of reference pixels; got ${value}.`);
+  }
+  return parsed;
+}
+
+/** A position for `tv reposition-artifact`: a whole number from 1. The upper bound needs the channel. */
+function parseArtifactPosition(value: string): number {
+  if (!/^\d+$/.test(value.trim()) || Number(value) < 1) {
+    throw createDirectiveError(`tv reposition-artifact --position must be a whole number from 1; got ${value}.`);
+  }
+  return Number(value);
+}
+
+// specs/product/cli.md#^cli-before-after
+const PLACE_BEFORE_HELP = "Place the artifact immediately before (left of) this artifact on the channel; otherwise it goes at the end";
+const PLACE_AFTER_HELP = "Place the artifact immediately after (right of) this artifact on the channel; otherwise it goes at the end";
+
+/** The placement `--before` or `--after` gives; the server checks the named artifact. */
+function resolvePlacement(commandName: string, opts: { before?: string; after?: string }): ArtifactPlacement {
+  if (opts.before !== undefined && opts.after !== undefined) {
+    throw createDirectiveError(`tv ${commandName} accepts --before or --after, not both.`);
+  }
+  if (opts.before !== undefined) return { before: opts.before };
+  if (opts.after !== undefined) return { after: opts.after };
+  return {};
+}
+
 function resolveFocusDirective(
   argv: string[],
   commandName: string,
@@ -1340,10 +1372,13 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
     .requiredOption("--path <path>", "Absolute path to an existing markdown/HTML file or indexed directory (trailing separator optional)")
     .option("--focus-artifact", "Focus the new artifact after creation")
     .option("--no-focus", "Create the artifact in the background without changing focus")
+    .option("--before <artifact-id>", PLACE_BEFORE_HELP)
+    .option("--after <artifact-id>", PLACE_AFTER_HELP)
     .option("--port <number>", "Server port; required when the config file sets port 0", parseClientPortOption)
     .addHelpText("after", buildArtifactWorkflowHelpNote(true))
-    .action(async (opts: { channel: string; title: string; path: string; port?: number }) => {
+    .action(async (opts: { channel: string; title: string; path: string; before?: string; after?: string; port?: number }) => {
       const shouldFocus = resolveFocusDirective(argv, "create-path-artifact", "--focus-artifact");
+      const placement = resolvePlacement("create-path-artifact", opts);
       const artifactPath = opts.path.trim();
       const client = createAuthenticatedClient(opts);
       const { artifact } = await client.artifacts.create({
@@ -1351,6 +1386,7 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
         path: artifactPath,
         title: opts.title,
         channelID: opts.channel,
+        ...placement,
       });
       if (shouldFocus) {
         await client.display.focus({ artifactID: artifact.id });
@@ -1370,10 +1406,13 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
     .requiredOption("--url <url>", "http(s) URL")
     .option("--focus-artifact", "Focus the new artifact after creation")
     .option("--no-focus", "Create the artifact in the background without changing focus")
+    .option("--before <artifact-id>", PLACE_BEFORE_HELP)
+    .option("--after <artifact-id>", PLACE_AFTER_HELP)
     .option("--port <number>", "Server port; required when the config file sets port 0", parseClientPortOption)
     .addHelpText("after", buildArtifactWorkflowHelpNote(true))
-    .action(async (opts: { channel: string; title: string; url: string; port?: number }) => {
+    .action(async (opts: { channel: string; title: string; url: string; before?: string; after?: string; port?: number }) => {
       const shouldFocus = resolveFocusDirective(argv, "create-url-artifact", "--focus-artifact");
+      const placement = resolvePlacement("create-url-artifact", opts);
       const artifactURL = opts.url.trim();
       const client = createAuthenticatedClient(opts);
       const { artifact } = await client.artifacts.create({
@@ -1381,6 +1420,7 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
         url: artifactURL,
         title: opts.title,
         channelID: opts.channel,
+        ...placement,
       });
       if (shouldFocus) {
         await client.display.focus({ artifactID: artifact.id });
@@ -1430,6 +1470,113 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
       for (const line of formatDeleteArtifactResult(result)) {
         writeLine(env.stdout, line);
       }
+    });
+
+  program
+    .command("reposition-artifact")
+    .description(
+      "Change an artifact's size in reference pixels (the size it shows at on a 1280x800 stage), its full-screen state, or its position in its channel's left-to-right order, on whatever channel holds it. The changes apply together as one shared layout update, as if made in the app. Read a channel's arrangement with `tv get-channel`.",
+    )
+    .requiredOption("--id <id>", "Artifact ID")
+    .option("--width <px>", "Width in reference pixels; finite and positive")
+    .option("--height <px>", "Height in reference pixels; finite and positive")
+    .option("--full-screen", "Make the artifact full-screen")
+    .option("--no-full-screen", "Take the artifact out of full-screen; its size is unchanged")
+    .option("--position <n>", "Position in the channel's order, counting from 1 at the left")
+    .option("--before <artifact-id>", "Place the artifact immediately before (left of) this artifact on its channel")
+    .option("--after <artifact-id>", "Place the artifact immediately after (right of) this artifact on its channel")
+    .option("--port <number>", "Server port; required when the config file sets port 0", parseClientPortOption)
+    .action(async (opts: { id: string; width?: string; height?: string; fullScreen?: boolean; position?: string; before?: string; after?: string; port?: number }) => {
+      // specs/product/cli.md#^cli-reposition-artifact
+      const fullScreenFlags = argv.filter((token) => token === "--full-screen" || token === "--no-full-screen");
+      if (new Set(fullScreenFlags).size > 1) {
+        throw createDirectiveError("tv reposition-artifact accepts --full-screen or --no-full-screen, not both.");
+      }
+      const fullScreen = fullScreenFlags.length === 0 ? undefined : fullScreenFlags[0] === "--full-screen";
+      const width = opts.width === undefined ? undefined : parseArtifactDimension("--width", opts.width);
+      const height = opts.height === undefined ? undefined : parseArtifactDimension("--height", opts.height);
+      const position = opts.position === undefined ? undefined : parseArtifactPosition(opts.position);
+      if ([opts.position, opts.before, opts.after].filter((value) => value !== undefined).length > 1) {
+        throw createDirectiveError("tv reposition-artifact accepts only one of --position, --before, or --after.");
+      }
+      const named = opts.before ?? opts.after;
+      if (named === opts.id) {
+        throw createDirectiveError(`tv reposition-artifact cannot place artifact ${opts.id} before or after itself; name another artifact.`);
+      }
+      if (width === undefined && height === undefined && fullScreen === undefined && position === undefined && named === undefined) {
+        throw createDirectiveError("tv reposition-artifact requires at least one of --width, --height, --full-screen, --no-full-screen, --position, --before, or --after.");
+      }
+
+      const client = createAuthenticatedClient(opts);
+      const { channels } = await client.channels.list();
+      const channel = channels.find((candidate) => candidate.layout.some((page) => page.artifactIds.includes(opts.id)));
+      if (channel === undefined) throw new ValidationError(`Artifact not found: ${opts.id}`);
+      if (position !== undefined && position > channel.layout.length) {
+        throw new ValidationError(
+          `--position must be from 1 to ${channel.layout.length} on channel ${channel.id}; got ${position}.`,
+        );
+      }
+
+      const index = channel.layout.findIndex((page) => page.artifactIds.includes(opts.id));
+      const current = channel.layout[index]!;
+      const changed: TabPage = {
+        ...current,
+        geometry: fullScreen === undefined ? current.geometry : { ...current.geometry, full_screen: fullScreen },
+        size: { width: width ?? current.size.width, height: height ?? current.size.height },
+      };
+      const layout = channel.layout.filter((_page, pageIndex) => pageIndex !== index);
+      let insertAt = position === undefined ? index : position - 1;
+      if (named !== undefined) {
+        const namedIndex = layout.findIndex((page) => page.artifactIds.includes(named));
+        if (namedIndex === -1) throw new ValidationError(`Artifact ${named} is not on channel ${channel.id}.`);
+        insertAt = opts.before !== undefined ? namedIndex : namedIndex + 1;
+      }
+      layout.splice(insertAt, 0, changed);
+      try {
+        await client.channels.update({ channelID: channel.id, layout });
+      } catch (error) {
+        // The server refuses a layout whose membership no longer matches, which
+        // means another change reached the channel after it was read.
+        if ((error as { status?: unknown }).status === HTTP_CONFLICT_STATUS) {
+          throw new ValidationError(
+            `Channel ${channel.id} changed before artifact ${opts.id} could be repositioned, so nothing changed. Run the command again.`,
+          );
+        }
+        throw error;
+      }
+      writeLine(env.stdout, `Artifact ${opts.id} repositioned.`);
+    });
+
+  program
+    .command("move-artifact")
+    .description(
+      "Move an artifact to another channel. It stays the same artifact, keeping its ID, store, and share link, and goes at the end of that channel's order, or beside the artifact --before or --after names, at the size and full-screen state it had. If it is already on that channel, --before or --after still moves it beside the artifact named, and without them nothing changes. To show the same path or URL on two channels at once, create a second artifact instead.",
+    )
+    .requiredOption("--id <id>", "Artifact ID")
+    .requiredOption("--channel <id>", "Target channel ID")
+    .option("--focus-artifact", "Focus the artifact on its new channel after the move")
+    .option("--no-focus", "Move the artifact without changing focus")
+    .option("--before <artifact-id>", PLACE_BEFORE_HELP)
+    .option("--after <artifact-id>", PLACE_AFTER_HELP)
+    .option("--port <number>", "Server port; required when the config file sets port 0", parseClientPortOption)
+    .action(async (opts: { id: string; channel: string; before?: string; after?: string; port?: number }) => {
+      // specs/product/cli.md#^cli-move-artifact
+      const shouldFocus = resolveFocusDirective(argv, "move-artifact", "--focus-artifact");
+      const placement = resolvePlacement("move-artifact", opts);
+      if (opts.before === opts.id || opts.after === opts.id) {
+        throw createDirectiveError(`tv move-artifact cannot place artifact ${opts.id} before or after itself; name another artifact.`);
+      }
+      const client = createAuthenticatedClient(opts);
+      const result = await client.artifacts.move({ artifactID: opts.id, channelID: opts.channel, ...placement });
+      if (shouldFocus) {
+        await client.display.focus({ artifactID: opts.id });
+      }
+      const messages = {
+        moved: `Artifact ${opts.id} moved to channel ${result.channelID}.`,
+        repositioned: `Artifact ${opts.id} repositioned on channel ${result.channelID}.`,
+        unchanged: `Artifact ${opts.id} is already on channel ${result.channelID}.`,
+      };
+      writeLine(env.stdout, messages[result.outcome]);
     });
 
   program
@@ -1641,7 +1788,7 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
   program
     .command("focus-artifact")
     .description(
-      "Send a transient focus nudge for a specific artifact. Connected clients select the artifact's tab page and switch to its channel when needed. This is NOT persisted as state — there is no concept of a 'focused artifact' that survives reconnects (the focused channel is persistent, but artifact focus is a one-shot event).",
+      "Send a transient focus nudge for a specific artifact. Connected clients select the artifact and switch to its channel when needed. This is NOT persisted as state — there is no concept of a 'focused artifact' that survives reconnects (the focused channel is persistent, but artifact focus is a one-shot event).",
     )
     .requiredOption("--id <id>", "Artifact ID")
     .option("--port <number>", "Server port; required when the config file sets port 0", parseClientPortOption)
