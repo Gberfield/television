@@ -8,6 +8,7 @@ import {
   DEFAULT_PAGE_GEOMETRY,
   DEFAULT_PAGE_SIZE,
   type ServerEvent,
+  type ServerStatusMessage,
   type TabPage,
 } from "@telepath-computer/television-shared";
 import { Server } from "../src/server.ts";
@@ -92,7 +93,9 @@ function eventsUntilChannelUpdate(ws: WebSocket, channelID: string): Promise<Ser
       reject(new Error(`Timed out waiting for channel update: ${channelID}`));
     }, 2_000);
     const onMessage = (data: WebSocket.RawData): void => {
-      const event = JSON.parse(String(data)) as ServerEvent;
+      const event = JSON.parse(String(data)) as ServerEvent | ServerStatusMessage;
+      // Every connection's first message; it can arrive after the listener is attached.
+      if (event.type === "server-status") return;
       events.push(event);
       if (event.type !== "channel-updated" || event.channel.id !== channelID) return;
       clearTimeout(timeout);
@@ -232,17 +235,62 @@ describe("placing a page before or after an artifact", () => {
   });
 
   // proofs/arch/layout/index.md#^ly-ac-placement-move-same
-  it("ignores a placement when the artifact is already on the channel", async () => {
+  it.each([
+    ["target", "target-c", { before: "target-a" }, () => named([page(["target-c"]), page(["target-a"]), page(["target-b"])])],
+    ["source", "moved", { after: "source-other" }, () => named([page(["source-other"]), page(["moved"], true, MOVED_SIZE)])],
+  ] as const)(
+    "repositions an artifact on the channel already holding it (%s channel)",
+    async (channel, artifact, placement, expectedLayout) => {
+      const fx = fixture();
+      const channelID = channel === "target" ? fx.target : fx.source;
+      const first = await start(fx);
+      const ws = await openEvents(first.server, first.token);
+      const events = eventsUntilChannelUpdate(ws, channelID);
+      const expected = expectedLayout();
+
+      await move(first.server, first.token, artifact, channelID, placement)
+        .expect(200)
+        .expect(({ body }) => expect(body).toEqual({ outcome: "repositioned", artifactID: id(artifact), channelID }));
+
+      const received = await events;
+      ws.close();
+      expect(received.map((event) => event.type)).toEqual(["channel-updated"]);
+      expect((received[0] as Extract<ServerEvent, { type: "channel-updated" }>).channel.layout).toEqual(expected);
+      expect(await layoutOf(first.server, first.token, channelID)).toEqual(expected);
+
+      await stop(first.server);
+      const restarted = await start(fx);
+      expect(await layoutOf(restarted.server, restarted.token, channelID)).toEqual(expected);
+    },
+  );
+
+  // proofs/arch/layout/index.md#^ly-ac-placement-move-same-unchanged
+  it("reports unchanged when a same-channel placement keeps the order", async () => {
     const fx = fixture();
     const { server, token } = await start(fx);
     const storedBefore = readFileSync(channelPath(fx.storagePath, fx.target));
 
-    // The named artifact is on another channel, so a placement checked before
-    // the same-channel return would be rejected.
-    await move(server, token, "target-c", fx.target, { before: "source-other" })
+    await move(server, token, "target-b", fx.target, { after: "target-a" })
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: id("target-c"), channelID: fx.target }));
+      .expect(({ body }) => expect(body).toEqual({ outcome: "unchanged", artifactID: id("target-b"), channelID: fx.target }));
 
+    expect(await layoutOf(server, token, fx.target)).toEqual(named(TARGET_BEFORE));
+    expect(readFileSync(channelPath(fx.storagePath, fx.target))).toEqual(storedBefore);
+  });
+
+  // proofs/arch/layout/index.md#^ly-ac-placement-move-same-unchanged
+  it.each([
+    ["the moved artifact itself", { before: "target-c" }, null],
+    ["an artifact on another channel", { before: "source-other" }, "source-other"],
+  ])("rejects a same-channel placement naming %s", async (_case, placement, namedArtifact) => {
+    const fx = fixture();
+    const { server, token } = await start(fx);
+    const storedBefore = readFileSync(channelPath(fx.storagePath, fx.target));
+
+    const response = await move(server, token, "target-c", fx.target, placement);
+
+    expect(response.status).toBe(400);
+    if (namedArtifact !== null) expect(response.body.error).toBe(`Artifact ${id(namedArtifact)} is not on channel ${fx.target}.`);
     expect(await layoutOf(server, token, fx.target)).toEqual(named(TARGET_BEFORE));
     expect(readFileSync(channelPath(fx.storagePath, fx.target))).toEqual(storedBefore);
   });

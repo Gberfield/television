@@ -179,7 +179,7 @@ describe("skills build", () => {
 
     expect(guidance).toContain("A created or moved artifact goes at the end of the channel's order unless you name a neighbour");
     expect(guidance).toContain("`--before <artifact-id>` puts it immediately to the left of that artifact, and `--after <artifact-id>` immediately to its right");
-    expect(guidance).toContain("use `tv reposition-artifact` to change its place there");
+    expect(guidance).toContain("Moving an artifact to the channel it is already on changes nothing unless you give `--before` or `--after`; then it moves beside the artifact you name");
     expect(guidance).toContain("- `--before <artifact-id>` or `--after <artifact-id>` — put the artifact immediately left or right of another artifact on its channel");
     expect(guidance).not.toMatch(/\bpages?\b/i);
   });

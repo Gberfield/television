@@ -3460,6 +3460,8 @@ describe("page arrangement and moving commands", () => {
     ["moved", "--focus-artifact", "Artifact middle moved to channel other-channel.\n", true],
     ["unchanged", "--no-focus", "Artifact middle is already on channel other-channel.\n", false],
     ["unchanged", "--focus-artifact", "Artifact middle is already on channel other-channel.\n", true],
+    ["repositioned", "--no-focus", "Artifact middle repositioned on channel other-channel.\n", false],
+    ["repositioned", "--focus-artifact", "Artifact middle repositioned on channel other-channel.\n", true],
   ])("move-artifact reports outcome %s with %s", async (outcome, directive, expected, focuses) => {
     const { stdout, stderr, client, env } = arrange();
     client.artifacts.move.mockResolvedValue({ outcome, artifactID: "middle", channelID: "other-channel" });
@@ -3541,6 +3543,18 @@ describe("page arrangement and moving commands", () => {
       expect(client.artifacts.move).not.toHaveBeenCalled();
       expect(stdout.toString()).toBe("");
       expect(stderr.toString()).toContain("accepts --before or --after, not both.");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    },
+  );
+
+  it.each(["--before", "--after"])(
+    "move-artifact rejects %s naming the moved artifact without a client call",
+    async (option) => {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI(["move-artifact", "--id", "a", "--channel", "home-channel", option, "a", "--no-focus"], env)).toBe(1);
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain("tv move-artifact cannot place artifact a before or after itself; name another artifact.");
       expect(stderr.toString()).toContain(SKILL_POINTER);
     },
   );

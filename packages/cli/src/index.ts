@@ -1550,7 +1550,7 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
   program
     .command("move-artifact")
     .description(
-      "Move an artifact to another channel. It stays the same artifact, keeping its ID, store, and share link, and goes at the end of that channel's order, or beside the artifact --before or --after names, at the size and full-screen state it had. If it is already on that channel nothing changes; use `tv reposition-artifact` to change its place there. To show the same path or URL on two channels at once, create a second artifact instead.",
+      "Move an artifact to another channel. It stays the same artifact, keeping its ID, store, and share link, and goes at the end of that channel's order, or beside the artifact --before or --after names, at the size and full-screen state it had. If it is already on that channel, --before or --after still moves it beside the artifact named, and without them nothing changes. To show the same path or URL on two channels at once, create a second artifact instead.",
     )
     .requiredOption("--id <id>", "Artifact ID")
     .requiredOption("--channel <id>", "Target channel ID")
@@ -1563,17 +1563,20 @@ function createProgram(env: CLIEnvironment, invocation: CLIInvocation = { argv: 
       // specs/product/cli.md#^cli-move-artifact
       const shouldFocus = resolveFocusDirective(argv, "move-artifact", "--focus-artifact");
       const placement = resolvePlacement("move-artifact", opts);
+      if (opts.before === opts.id || opts.after === opts.id) {
+        throw createDirectiveError(`tv move-artifact cannot place artifact ${opts.id} before or after itself; name another artifact.`);
+      }
       const client = createAuthenticatedClient(opts);
       const result = await client.artifacts.move({ artifactID: opts.id, channelID: opts.channel, ...placement });
       if (shouldFocus) {
         await client.display.focus({ artifactID: opts.id });
       }
-      writeLine(
-        env.stdout,
-        result.outcome === "moved"
-          ? `Artifact ${opts.id} moved to channel ${result.channelID}.`
-          : `Artifact ${opts.id} is already on channel ${result.channelID}.`,
-      );
+      const messages = {
+        moved: `Artifact ${opts.id} moved to channel ${result.channelID}.`,
+        repositioned: `Artifact ${opts.id} repositioned on channel ${result.channelID}.`,
+        unchanged: `Artifact ${opts.id} is already on channel ${result.channelID}.`,
+      };
+      writeLine(env.stdout, messages[result.outcome]);
     });
 
   program

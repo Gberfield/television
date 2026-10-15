@@ -684,6 +684,11 @@ describe("CLI product spine acceptance", () => {
     expect((await tv(["reposition-artifact", "--id", b, "--before", x])).exitCode).toBe(0);
     expect(await order()).toEqual([b, x, a, added]);
 
+    const repositioned = await tv(["move-artifact", "--id", added, "--channel", home.id, "--before", x, "--no-focus"]);
+    expect(repositioned.exitCode).toBe(0);
+    expect(repositioned.stdout).toBe(`Artifact ${added} repositioned on channel ${home.id}.\n`);
+    expect(await order()).toEqual([b, added, x, a]);
+
     const target = path.join(makeTempDir("television-cli-acceptance-before-after-target-", dirs), "note.md");
     writeFileSync(target, "# Note\n");
     const otherAgain = await channel("Elsewhere", 1);

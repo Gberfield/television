@@ -86,7 +86,7 @@ export type CreateArtifactResult = { artifact: Artifact; channelID: string };
  */
 export type ArtifactPlacement = { before?: string; after?: string };
 /** The outcome of moving an artifact to a channel (specs/arch/layout/index.md#^ly-move). */
-export type MoveArtifactResult = { outcome: "moved" | "unchanged"; artifactID: string; channelID: string };
+export type MoveArtifactResult = { outcome: "moved" | "repositioned" | "unchanged"; artifactID: string; channelID: string };
 
 /** Response shape for `DELETE /artifacts/:id`. */
 export type DeleteArtifactResult =

@@ -885,7 +885,7 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     }
     const target = this.requireChannel(input.channelID);
     const sourceID = this.artifactChannels.get(artifactID);
-    if (sourceID === target.id) return { outcome: "unchanged", artifactID, channelID: target.id };
+    if (sourceID === target.id) return this.repositionByMove(artifactID, target, input);
     if (sourceID === undefined) {
       // Left on no channel by a move that did not finish; no channel holds it.
       throw new NotFoundError(`Artifact not found: ${artifactID}`, { entityType: "artifact", entityID: artifactID });
@@ -924,6 +924,20 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     this.dispatchEvent(new ArtifactCreatedEvent("artifact-created", { channelID: target.id, artifact: this._artifacts.get(artifactID)! }));
     this.dispatchEvent(new ChannelUpdatedEvent("channel-updated", { channel: target }));
     return { outcome: "moved", artifactID, channelID: target.id };
+  }
+
+  /** A move to the channel already holding the artifact applies its placement as one layout update. */
+  private repositionByMove(artifactID: string, channel: Channel, placement: ArtifactPlacement): MoveArtifactResult {
+    const unchanged: MoveArtifactResult = { outcome: "unchanged", artifactID, channelID: channel.id };
+    if (placement.before === undefined && placement.after === undefined) return unchanged;
+    if (placement.before === artifactID || placement.after === artifactID) {
+      throw new InvalidRequestError(`Cannot place artifact ${artifactID} before or after itself.`);
+    }
+    const page = channel.layout.find((candidate) => candidate.artifactIds.includes(artifactID))!;
+    const layout = placePage({ ...channel, layout: channel.layout.filter((candidate) => candidate !== page) }, page, placement);
+    if (layout.every((candidate, index) => candidate === channel.layout[index])) return unchanged;
+    this.updateChannel({ channelID: channel.id, fields: { layout } });
+    return { outcome: "repositioned", artifactID, channelID: channel.id };
   }
 
   /**

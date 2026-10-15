@@ -119,7 +119,7 @@ These are illustrative, not exhaustive. When the language is ambiguous or unusua
 
 Artifact creation commands require `--channel` because new artifacts need immediate channel membership. `tv move-artifact --id <id> --channel <target> (--focus-artifact|--no-focus)` moves an existing artifact to another channel. It stays the same artifact, so its ID, its store, and its share link keep working, and it keeps the size and full-screen state it had. Creating a second artifact with the same `--path` or `--url` on the other channel instead shows the content in both places, as two artifacts with separate stores.
 
-A created or moved artifact goes at the end of the channel's order unless you name a neighbour: `--before <artifact-id>` puts it immediately to the left of that artifact, and `--after <artifact-id>` immediately to its right. Use at most one of the two. The named artifact must already be on that channel; otherwise nothing changes and the command reports an error. Moving an artifact to the channel it is already on changes nothing, even with `--before` or `--after`; use `tv reposition-artifact` to change its place there.
+A created or moved artifact goes at the end of the channel's order unless you name a neighbour: `--before <artifact-id>` puts it immediately to the left of that artifact, and `--after <artifact-id>` immediately to its right. Use at most one of the two. The named artifact must already be on that channel; otherwise nothing changes and the command reports an error. Moving an artifact to the channel it is already on changes nothing unless you give `--before` or `--after`; then it moves beside the artifact you name.
 
 Think carefully about whether the user means:
 
