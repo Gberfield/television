@@ -260,7 +260,7 @@ Upgrade instructions use `.desktop-upgrade-gate > .dialog-overlay > dialog > .di
 <!-- app-reference-source: specs/ui/app/sidebar/delete-confirm.frame sha256: 940dfd33179c4a59e1190efd4bb48b12a04fb2e8f246db9f5edb619e2ed6f75a -->
 <!-- app-reference-source: specs/ui/app/sidebar/sidebar.frame sha256: 7e92cd473576d4a47f576342a09542ad8021dc8b60c978b1d8196a62b0aa1b87 -->
 <!-- app-reference-source: specs/ui/app/skill-selector/skill-selector.frame sha256: 7474d8a456c13f2064b90c43d04a37ffae9ef9e542ffa39a16fcbf27f6158a7f -->
-<!-- app-reference-source: specs/ui/app/stage/stage.frame sha256: c037b88962a2dd2a554ba44e3bc91f1ec3c1ef7d773e3ffecce33c5a35115081 -->
+<!-- app-reference-source: specs/ui/app/stage/stage.frame sha256: a4ec027d1aa152f456704df57d32b319e62405343fc8026cae31f97532314bfd -->
 <!-- app-reference-source: specs/ui/app/styles.css sha256: b3129a9c9fe4ad498324983304ef7ec448f3a510a9eb337d1ee24f5c003c0f84 -->
 <!-- app-reference-source: specs/ui/app/system-modal/system-modal.frame sha256: 5b2d6762819fd376cbfff840be88c4fb87e4713c5a7b98f478ab93246b1762c0 -->
 <!-- app-reference-source: specs/ui/app/tab-strip/tab-placeholder.frame sha256: 68f1be9e5bb91802c2877e63fd79e6c2157eae09f6a8729b2a3ae2f6bdc5cac3 -->

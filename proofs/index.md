@@ -126,7 +126,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - **skill-selector/**
       - `index.md` (26 lines) — *How the promises in Skill selector (UI) are proven.*
     - **stage/**
-      - `index.md` (46 lines) — *How the promises in Stage (UI) are proven.*
+      - `index.md` (47 lines) — *How the promises in Stage (UI) are proven.*
     - **system-modal/**
       - `index.md` (27 lines) — *Coverage of the dialog shown while Television cannot use its server, with real input for blocking behavior and native Electron dragging.*
     - **tab-strip/**
