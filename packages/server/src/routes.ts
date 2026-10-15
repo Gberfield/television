@@ -353,7 +353,7 @@ export function registerRoutes(
       return;
     }
     try {
-      res.json(store.moveArtifact({ artifactID: req.params.id, ...parsed.data }));
+      res.json(store.moveArtifact({ artifactID: req.params.id, ...parsed.data }, telemetryContext(req)));
     } catch (error) {
       handleStoreError(res, error, "Failed to move artifact");
     }

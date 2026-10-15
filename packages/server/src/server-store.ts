@@ -878,14 +878,14 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
    * target. A failed target save, like a stop between the two, leaves the
    * artifact on no channel; that risk is accepted to keep a move simple.
    */
-  moveArtifact(input: { artifactID: string; channelID: string } & ArtifactPlacement): MoveArtifactResult {
+  moveArtifact(input: { artifactID: string; channelID: string } & ArtifactPlacement, telemetryContext?: TelemetryClientContext | null): MoveArtifactResult {
     const { artifactID } = input;
     if (!this._artifacts.has(artifactID)) {
       throw new NotFoundError(`Artifact not found: ${artifactID}`, { entityType: "artifact", entityID: artifactID });
     }
     const target = this.requireChannel(input.channelID);
     const sourceID = this.artifactChannels.get(artifactID);
-    if (sourceID === target.id) return this.repositionByMove(artifactID, target, input);
+    if (sourceID === target.id) return this.repositionByMove(artifactID, target, input, telemetryContext);
     if (sourceID === undefined) {
       // Left on no channel by a move that did not finish; no channel holds it.
       throw new NotFoundError(`Artifact not found: ${artifactID}`, { entityType: "artifact", entityID: artifactID });
@@ -927,7 +927,12 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
   }
 
   /** A move to the channel already holding the artifact applies its placement as one layout update. */
-  private repositionByMove(artifactID: string, channel: Channel, placement: ArtifactPlacement): MoveArtifactResult {
+  private repositionByMove(
+    artifactID: string,
+    channel: Channel,
+    placement: ArtifactPlacement,
+    telemetryContext?: TelemetryClientContext | null,
+  ): MoveArtifactResult {
     const unchanged: MoveArtifactResult = { outcome: "unchanged", artifactID, channelID: channel.id };
     if (placement.before === undefined && placement.after === undefined) return unchanged;
     if (placement.before === artifactID || placement.after === artifactID) {
@@ -936,7 +941,7 @@ export class ServerStore extends EventTarget<StoreDomainEvent> {
     const page = channel.layout.find((candidate) => candidate.artifactIds.includes(artifactID))!;
     const layout = placePage({ ...channel, layout: channel.layout.filter((candidate) => candidate !== page) }, page, placement);
     if (layout.every((candidate, index) => candidate === channel.layout[index])) return unchanged;
-    this.updateChannel({ channelID: channel.id, fields: { layout } });
+    this.updateChannel({ channelID: channel.id, fields: { layout } }, telemetryContext);
     return { outcome: "repositioned", artifactID, channelID: channel.id };
   }
 
