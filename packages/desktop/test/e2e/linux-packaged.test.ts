@@ -14,6 +14,7 @@ import {randomUUID} from "node:crypto";
 import { disconnectFromServerMenu } from "./helpers.ts";
 import { DESKTOP_UPDATE_DOWNLOADED_CHANNEL, RESTART_TO_INSTALL_UPDATE_CHANNEL } from "../../src/desktop-update.ts";
 
+const packageVersion = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
 const packageDir = process.env.TV_LINUX_PACKAGE_DIR;
 const packageLauncher = process.env.TV_LINUX_PACKAGE_LAUNCHER ?? "television-launcher";
 const evidenceDir = process.env.TV_LINUX_EVIDENCE_DIR;
@@ -68,7 +69,7 @@ test("packaged Linux client authenticates, renders artifacts, applies native app
         getLastWebPreferences(): { sandbox?: boolean };
       }).getLastWebPreferences().sandbox,
     }));
-    expect(native).toMatchObject({ packaged: true, name: "Television", version: "1.4.23", ozone: backend, maximizable: true, visible: true });
+    expect(native).toMatchObject({ packaged: true, name: "Television", version: packageVersion, ozone: backend, maximizable: true, visible: true });
     let rendererSandboxStatus: { seccomp: string; noNewPrivileges: string } | undefined;
     if (requireSandbox) {
       expect(native.sandboxDisabled, "Host acceptance must retain the production sandbox").toBe(false);
