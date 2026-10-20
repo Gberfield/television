@@ -106,9 +106,13 @@ describe("/acp WebSocket", () => {
   const harnesses: Harness[] = [];
 
   afterEach(async () => {
-    for (const h of harnesses.splice(0)) {
-      await h.server.dispose();
-      rmSync(h.storagePath, { recursive: true, force: true });
+    try {
+      for (const h of harnesses.splice(0)) {
+        await h.server.dispose();
+        rmSync(h.storagePath, { recursive: true, force: true });
+      }
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 
@@ -164,17 +168,22 @@ describe("/acp WebSocket", () => {
   });
 
   it("does not mix ACP traffic into the /events channel", async () => {
+    // Keep this stream assertion independent of update-feed broadcasts.
+    // update-channel.seam.test.ts covers their real HTTP/WebSocket delivery.
+    vi.stubEnv("TV_TEST_VERSION", "0.0.0");
+    vi.stubEnv("TV_UPDATE_CHANNEL_URL", "");
     const h = await setup();
     const eventsSocket = new WebSocket(eventsURL(h.baseURL, h.token));
+    const initialStatus = nextMessage(eventsSocket);
     await opened(eventsSocket);
-
-    // ACP connect on /events is silently ignored (pub-sub only).
-    eventsSocket.send(JSON.stringify({ type: "acp-bridge-connect" }));
+    await expect(initialStatus).resolves.toMatchObject({ type: "server-status" });
 
     const race = Promise.race([
       nextMessage(eventsSocket),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 50)),
     ]);
+    // ACP connect on /events is silently ignored (pub-sub only).
+    eventsSocket.send(JSON.stringify({ type: "acp-bridge-connect" }));
     await expect(race).resolves.toBeNull();
     eventsSocket.close();
   });

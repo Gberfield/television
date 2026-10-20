@@ -13,7 +13,7 @@ export const ELECTRON_E2E_EXECUTABLE_PATH_ENV = "TV_ELECTRON_E2E_EXECUTABLE_PATH
 export function getElectronE2EInvocation(plan, extraArgs = []) {
   const playwrightArgs = ["playwright", "test", "--config=packages/desktop/playwright.config.ts", ...extraArgs];
   return plan.useXvfb
-    ? { command: "xvfb-run", args: ["-a", "npx", ...playwrightArgs] }
+    ? { command: "xvfb-run", args: ["-a", "-s", "-screen 0 3200x2400x24", "npx", ...playwrightArgs] }
     : { command: "npx", args: playwrightArgs };
 }
 

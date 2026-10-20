@@ -74,8 +74,12 @@ describe("/events websocket stream", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    for (const server of servers.splice(0)) await server.dispose();
-    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    try {
+      for (const server of servers.splice(0)) await server.dispose();
+      for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   async function harness() {
@@ -137,6 +141,10 @@ describe("/events websocket stream", () => {
   });
 
   it("sends exactly one server-status message on connect and replays no domain events", async () => {
+    // Keep this stream assertion independent of update-feed broadcasts.
+    // update-channel.seam.test.ts covers their real HTTP/WebSocket delivery.
+    vi.stubEnv("TV_TEST_VERSION", "0.0.0");
+    vi.stubEnv("TV_UPDATE_CHANNEL_URL", "");
     const h = await harness();
     const { ws, events, statusMessages } = await openEvents(h.server, h.store.authToken);
     await new Promise((resolve) => setTimeout(resolve, 50));
