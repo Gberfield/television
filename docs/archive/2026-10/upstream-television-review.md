@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #22.** This report informed an observation-only upstream review proposal; source integration and compatibility acceptance remain outstanding. This coherent review records the protected-path implications and cross-area reconciliation needed for a future source integration. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Television upstream update for review
 
 Observed upstream main: `a8e73fbf5eecfb27172ff5928ffb71f0c6844368` (1.5.4), versus integrated `c7545d6770fa4f5741d611314e4710939e28ebb7`. Fork target: `b745cecc7155f45ba18e84b57cc38dc5026017ca`.
