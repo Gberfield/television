@@ -38,13 +38,13 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `index.md` (53 lines) — *How the promises in Channel and client state (architecture) are proven.*
   - **cli/**
     - `admin-guide.md` (9 lines) — *Review and publication checks for the standalone administrator guide.*
-    - `index.md` (256 lines) — *How the promises in CLI architecture are proven.*
+    - `index.md` (258 lines) — *How the promises in CLI architecture are proven.*
     - `startup-bind-failure.md` (39 lines) — *How the promises in Startup bind failure are proven.*
   - **desktop/**
     - `appearance.md` (29 lines) — *How the promises in Desktop appearance are proven across renderer composition, Electron IPC, and the real desktop application.*
     - `connect-flow.md` (32 lines) — *Desktop connection coverage across link parsing, saved state, the packaged local page, native IPC, and server navigation.*
     - `distribution.md` (34 lines) — *How the ToDesktop build's promises are proven: repository checks of the desktop workspace, its ToDesktop configuration, a generated upload directory, the build script's exit status and the real ToDesktop CLI's dry run, and the product's real-host checks for everything ToDesktop does.*
-    - `e2e-harness.md` (21 lines) — *How the promises in Electron e2e harness are proven.*
+    - `e2e-harness.md` (22 lines) — *How the promises in Electron e2e harness are proven.*
     - `index.md` (28 lines) — *How the desktop architecture root's promises are proven: main-process identity contracts and a real-Electron data-location seam, composed with the module proofs and the product's real-host checks.*
     - `linux-distribution.md` (151 lines) — *Proves Linux distribution and updates through transport contracts, real shell scripts and inspected packages.*
     - `runtime.md` (21 lines) — *How the Electron runtime's promises are proven: exact-version declarations, runtime validity over authored package and runtime trees, and a real cold installation on a Node release known to truncate one.*
@@ -73,7 +73,7 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `attestation.md` (66 lines) — *How the promises in Test Attestation are proven.*
     - `blaxel-testshards.md` (47 lines) — *How the promises in Blaxel Test Shards are proven.*
     - `flaky-tests.md` (16 lines) — *How the promises in Flaky Tests are proven.*
-    - `github-ci.md` (55 lines) — *How the promises in GitHub Actions CI are proven.*
+    - `github-ci.md` (59 lines) — *How the promises in GitHub Actions CI are proven.*
     - `preflight.md` (42 lines) — *How the promises in Preflight are proven.*
     - `reporting.md` (42 lines) — *How the promises in Reporting are proven.*
     - `sharded-execution.md` (52 lines) — *How the promises in Sharded Execution are proven.*
@@ -99,8 +99,8 @@ Generated from the first-line description of every proof by `scripts/specs-index
     - `desktop-upgrade-recommendation.md` (27 lines) — *How the desktop upgrade recommendation is proven: the production thresholds read directly, decision and presentation contracts, a real-browser rendering seam, and the product's real-Electron journeys for the apps installed from npm that it reaches.*
     - `index.md` (39 lines) — *How the update domain's shared rules are proven: version validation and comparison contracts, repository checks of workspace versions and the publish workflow, including eligibility, queueing and its pause file, and the release order left to maintainers.*
     - `update-channel.md` (50 lines) — *How the promises in Update channel are proven.*
-    - `upstream-tracking.md` (29 lines) — *Synthetic Git and workflow contracts for downstream tracking, with hosted checks recorded separately.*
-    - `version-advertisement.md` (40 lines) — *How the promises in Version advertisement and client auto-reload are proven.*
+    - `upstream-tracking.md` (35 lines) — *Synthetic tracking contracts and exact-revision source validation, with hosted operational claims kept separate.*
+    - `version-advertisement.md` (44 lines) — *How the promises in Version advertisement and client auto-reload are proven.*
 - **ui/**
   - `index.md` (13 lines) — *How the promises in UI policy are proven.*
   - **app/**

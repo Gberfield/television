@@ -74,11 +74,12 @@ table-edge navigation does not create rows. See the
 [table contract](../../specs/arch/artifact-frame/markdown-tables-buffer.md) and
 [interaction buffer](../../specs/ui/markdown-editor/index.md#^md-table-interaction-buffer).
 
-Upstream tracking was activated through PRs #12 and #13. It observes Television
-and Omarchy separately, proposes draft updates, validates candidate revisions
-without publishing credentials, preserves fork versions and never merges Omarchy
-history. Owner review, compatibility acceptance, release and installation remain
-separate steps.
+Upstream tracking was activated through PRs #12 and #13. The owner-directed
+[manual local workflow](upstream-tracking.md) now keeps Actions disabled, validates
+exact candidate revisions with the canonical runner and supports read-only local
+discovery. The retained hosted proposal writer preserves fork versions and never
+merges Omarchy history; using it requires separate authority. Owner review,
+compatibility acceptance, release and installation remain separate steps.
 
 ## Scope of these docs
 
