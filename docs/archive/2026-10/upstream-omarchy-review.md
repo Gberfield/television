@@ -1,4 +1,4 @@
-> **Archived 2026-10 from PR #23.** This report informed an observation-only upstream review proposal; source integration and compatibility acceptance remain outstanding. This coherent review records the complete relevant-path inventory and its relationship to Linux desktop compatibility work. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+> **Archived 2026-10 from PR #23.** This report informed an observation-only compatibility review proposal; compatibility review and acceptance remain outstanding. This coherent review records the complete relevant-path inventory and its relationship to Linux desktop compatibility work. The body below is unchanged from its working state and is a clue to the change, not a record of it.
 
 # Omarchy compatibility update for review
 
