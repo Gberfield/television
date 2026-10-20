@@ -474,7 +474,7 @@ describe("CLI node integration artifact workflow", () => {
     const storagePath = mkdtempSync(path.join(os.tmpdir(), "television-cli-node-bind-failure-"));
     dirs.push(storagePath);
     writeHomeConfig(storagePath, { port: 0, auth: false, listen: ["192.0.2.1"] });
-    const owned = spawnOwnedProcess(process.execPath, [BUILT_CLI, "--home", storagePath, "serve"], {
+    const owned = spawnOwnedProcess(process.execPath, [BUILT_CLI, "--home", storagePath, "serve", "--print-links"], {
       cwd: REPO_ROOT,
       env: createServeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -535,7 +535,7 @@ describe("CLI node integration artifact workflow", () => {
     );
     expect(existsSync(configPath)).toBe(true);
 
-    const owned = spawnOwnedProcess(process.execPath, [BUILT_CLI, "--home", home, "serve"], {
+    const owned = spawnOwnedProcess(process.execPath, [BUILT_CLI, "--home", home, "serve", "--print-links"], {
       cwd: REPO_ROOT,
       env: createServeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -561,6 +561,7 @@ describe("CLI node integration artifact workflow", () => {
       expect(response.ok).toBe(true);
       expect(await response.json()).toEqual(expect.objectContaining({
         bindAddresses: ["127.0.0.1", nonLoopbackIPv4],
+        origins: startupURLs.map((url) => new URL(url).origin),
         port: Number.parseInt(new URL(startupURL).port, 10),
       }));
     }
@@ -572,7 +573,7 @@ describe("CLI node integration artifact workflow", () => {
     const storagePath = mkdtempSync(path.join(os.tmpdir(), "television-cli-node-storage-"));
     dirs.push(storagePath);
     writeHomeConfig(storagePath, { port: 0, auth: false });
-    const owned = spawnOwnedProcess(process.execPath, [TSX_CLI, "packages/cli/src/index.ts", "--home", storagePath, "serve"], {
+    const owned = spawnOwnedProcess(process.execPath, [TSX_CLI, "packages/cli/src/index.ts", "--home", storagePath, "serve", "--print-links"], {
       cwd: REPO_ROOT,
       env: createServeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -639,7 +640,7 @@ describe("CLI node integration artifact workflow", () => {
     const storagePath = mkdtempSync(path.join(os.tmpdir(), "television-cli-node-storage-"));
     dirs.push(storagePath);
     writeHomeConfig(storagePath, { port: 0 });
-    const owned = spawnOwnedProcess(process.execPath, [TSX_CLI, "packages/cli/src/index.ts", "--home", storagePath, "serve"], {
+    const owned = spawnOwnedProcess(process.execPath, [TSX_CLI, "packages/cli/src/index.ts", "--home", storagePath, "serve", "--print-links"], {
       cwd: REPO_ROOT,
       env: createServeEnv(),
       stdio: ["ignore", "pipe", "pipe"],

@@ -6,7 +6,7 @@ A proof says how a spec's promises are shown to hold. Specs are written and read
 
 ## Why proofs exist
 
-Spec ownership and review follow [spec policy](spec-policy.md#Slop-free zone). The assertions that prove a spec are written and reviewed by agents, and no person reads them line by line. Keeping them in a separate tree distinguishes what is promised in `specs/` from how each promise is proven in `proofs/`, and keeps assertion detail from burying the spec's testing directives. A spec's `## Testing` section remains its lever over proof design. Each proof opens with a coverage model written for a person to read when they choose to; no proof review is asked of them, though they may read or reproduce a proof out of interest or while debugging.
+Spec ownership and review follow [spec policy](spec-policy.md#Slop-free zone). The assertions that prove a spec are written and reviewed by agents, and no person reads them line by line. Keeping them in a separate tree distinguishes what is promised in `specs/` from how each promise is proven in `proofs/`, and keeps assertion detail from burying the spec's testing guidance. A spec's `## Testing guidance` section remains its lever over proof design. Each proof opens with a coverage model written for a person to read when they choose to; no proof review is asked of them, though they may read or reproduce a proof out of interest or while debugging.
 
 ## What a proof is and where it lives
 
@@ -36,7 +36,7 @@ Proves [specs/product/channels.md](../../specs/product/channels.md).
 
 The first line is a single italic sentence, as in a spec, and becomes the proof's index entry. The `Proves` line names the spec by relative link. The assertions are grouped however reads best for the spec.
 
-The *coverage model* is the part written for a person: a plain-English description, for a cold reader, of where the tests' boundaries lie. It includes, but is not limited to: what is proven by contract, what by seam, what by acceptance; the mocks in play and what each forfeits; important limitations and known deferrals; which of the spec's testing directives it honors, and where; and what relevant coverage lives in other proofs. Ten to twenty lines, written so that someone who reads nothing else in the proof can tell what the suite stands behind and what it leaves open. ^coverage-model
+The *coverage model* is the part written for a person: a plain-English description, for a cold reader, of where the tests' boundaries lie. It includes, but is not limited to: what is proven by contract, what by seam, what by acceptance; the mocks in play and what each forfeits; important limitations and known deferrals; which of the spec's testing guidance it honors, and where; and what relevant coverage lives in other proofs. Ten to twenty lines, written so that someone who reads nothing else in the proof can tell what the suite stands behind and what it leaves open. ^coverage-model
 
 Under `## Test hooks` the proof declares the production affordances its tests substitute or observe — an optional parameter, an environment variable, an exported helper — one sentence each: what a test may supply or read, and what production does instead. The proof is where these declarations live and where agents keep them current as the tests change. ^test-hooks
 
@@ -62,11 +62,15 @@ The one thing a proof never does is decide what an ambiguous spec means. When th
 
 Coverage of a feature usually spans several specs, and so several proofs: a product proof proves the spine end to end, and the architecture proofs behind it carry the breadth and forfeit the real crossing to that walk. Proofs cite each other, and specs, with the ordinary reference conventions ([spec-policy.md](spec-policy.md), References). A proof that forfeits a crossing names the proof that carries it.
 
-## Testing directives
+## Testing guidance
 
-A spec may use a `## Testing` section for human-owned guidance about how its promises should be tested, at whatever level of detail the author finds useful. These *testing directives* add decisions or context that the proof would not reliably derive from the promises alone. Restating conclusions already derivable from the spec's promises in the Testing section is an anti-pattern: it creates duplicate content that must be maintained alongside the spec and proof. Converting promises into assertions remains the proof's job; the Testing section contributes the author's additional guidance, keeping each promise in its single authoritative statement. The proof honors every directive and says where in its coverage model; one it cannot honor goes back to the spec as a finding. ^testing-directives
+A spec may carry a `## Testing guidance` section, defined by [spec policy](spec-policy.md#^testing-guidance-rule): guidance that a proof would not reliably derive from the spec's promises and the testing policy. Converting promises into assertions remains the proof's job. The proof honors every item of testing guidance and says where in its coverage model; one it cannot honor goes back to the spec as a finding. ^testing-guidance
 
-A testing directive is guidance for proof derivation. It is not itself a spec promise, and it is not subject to the coverage discipline that applies to the promises in the body of the spec. A directive is honored by the design of the tests, and the proof’s coverage model says where; it orders no assertion of its own. If a Testing section says the tests use Playwright, the proof designs its tests to run in Playwright. It does not order an additional test proving that the tests use Playwright. The Testing section is a rider on the spec that shapes how the promises above it are proven; the authority the proof and its reviewers derive assertions from is the rest of the spec. ^testing-directive-standing
+Testing guidance is not itself a spec promise, and it is not subject to the coverage discipline that applies to the promises in the body of the spec. Guidance is honored by the design of the tests, and the proof’s coverage model says where; it orders no assertion of its own, except that a regression case orders the coverage that keeps its failure from returning. If the guidance says the tests use Playwright, the proof designs its tests to run in Playwright. It does not order an additional test proving that the tests use Playwright. The authority the proof and its reviewers derive assertions from is the rest of the spec. ^testing-guidance-standing
+
+## What each kind of proof carries
+
+A product spec's proof carries the acceptance assertions that establish its measures of acceptance. An architecture spec's proof carries contract, seam and acceptance assertions, in whatever form fits: end-to-end, integration or unit-level. Acceptance-style behaviour tests generally run as full, non-mocked end-to-end tests, but no kind of spec is bound to a particular test tier.
 
 ## Ownership and review
 

@@ -77,7 +77,7 @@ describe("Electron context and shell-version parsing (^t-electron-detection)", (
       electron: false,
       shellVersion: null,
     });
-    expect(detectElectronContext({ search: "?serverURL=http://x.test" })).toEqual({
+    expect(detectElectronContext({ search: "?token=secret-token" })).toEqual({
       electron: false,
       shellVersion: null,
     });
@@ -281,10 +281,9 @@ describe("the gate screen with the update operations (^t-gate-screen)", () => {
 });
 
 describe("gate presentation and precedence (^t-gate-precedence)", () => {
-  const PRIMARY = "http://primary.test";
 
   function mountToast(): { el: HTMLElement; presentation: UpdatePresentationState; sendEligibleToast(): void } {
-    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection(PRIMARY));
+    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection());
     const presentation = new UpdatePresentationState();
     const el = document.createElement("div");
     let controller!: UpdateNotificationController;
@@ -294,7 +293,6 @@ describe("gate presentation and precedence (^t-gate-precedence)", () => {
     controller = new UpdateNotificationController(draw);
     controller.configure({
       connectionOwner: owner,
-      primaryServerURL: PRIMARY,
       dismissalStorage: null,
       presentation,
     });
@@ -311,14 +309,14 @@ describe("gate presentation and precedence (^t-gate-precedence)", () => {
     return {
       el,
       presentation,
-      sendEligibleToast: () => dispatchServerStatus(owner, message, PRIMARY),
+      sendEligibleToast: () => dispatchServerStatus(owner, message),
     };
   }
 
   function mountRecommendation(
     presentation: UpdatePresentationState,
   ): { el: HTMLElement; connect(): void } {
-    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection(PRIMARY));
+    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection());
     const el = document.createElement("div");
     let controller!: UpdateNotificationController;
     const draw = (): void => {
@@ -327,7 +325,6 @@ describe("gate presentation and precedence (^t-gate-precedence)", () => {
     controller = new UpdateNotificationController(draw);
     controller.configure({
       connectionOwner: owner,
-      primaryServerURL: PRIMARY,
       dismissalStorage: null,
       presentation,
       desktopRecommendation: { electron: true, shellVersion: "0.1.210" },
@@ -345,7 +342,7 @@ describe("gate presentation and precedence (^t-gate-precedence)", () => {
   function mountDesktopSelfUpdateNotice(
     presentation: UpdatePresentationState,
   ): { el: HTMLElement; connect(): void } {
-    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection(PRIMARY));
+    const owner = new FakeUpdateConnectionOwner(new FakeUpdateConnection());
     const bridge = new StandInDesktopUpdateBridge();
     bridge.report("1.5.0");
     const el = document.createElement("div");
@@ -356,7 +353,6 @@ describe("gate presentation and precedence (^t-gate-precedence)", () => {
     controller = new UpdateNotificationController(draw);
     controller.configure({
       connectionOwner: owner,
-      primaryServerURL: PRIMARY,
       dismissalStorage: null,
       presentation,
       desktopUpdate: new DesktopUpdateState({ electron: true, bridge }),
