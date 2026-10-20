@@ -1,0 +1,255 @@
+# Omarchy compatibility update for review
+
+Observed default branch `quattro`: `3ac43659dcbf88e84d951e3ce979b48a60a7d1f2`. Stable release `v4.0.6`: `237f1b4071a0bff2296c6d740ba2b9fd695ebfa0`, replacing observed stable `v4.0.4` at `c668141e9c42b13c80c9ca4ea108e11708c5e8a5`. Recorded baseline remains `902fd8aebd98b6eedaa58276886a2f9f2876755f`; compatibility-reviewed SHA remains null.
+
+This report-only candidate imports no Omarchy history or code and advances observations only. Local Television tests validate the unchanged implementation plus proposal metadata; they do not accept physical Omarchy compatibility.
+
+## Complete comparison and review scope
+
+The initial GitHub comparison hit the 300-file inventory limit and exposed only 56 relevant paths plus a warning. A separate bare Git repository supplies the complete comparison: 388 commits after the baseline, 3,802 changed entries, 235 relevant entries including rename source/destination matching. The baseline is an ancestor of the observed head. Stable v4.0.4 to v4.0.6 changes 209 entries with rename detection disabled. Complete inventories and command diagnostics are preserved in `validation/upstream-review-20261020/`.
+
+Review themes/templates, Hyprland Lua configuration and focus/monitor/layout helpers, browser launch/handoff and Firefox policies, update/restart/keyring behavior, package/install migrations and system tray/shell integration. The stable changes include browser default/handoff commands, focus handling, stranded-lock-session recovery, shell restart, browser policies and shell theme/scaling changes. The default branch adds theme/background shortcuts and menu changes. Existing host configuration, default browser, services and installed Television remain untouched.
+
+## Compatibility acceptance still required
+
+Inspect the relevant behavior against the fork's Linux desktop, launcher/feed, tray, hide/restore and theme contracts. Run applicable canonical Linux/theme tests locally. Physical Hyprland/Wayland/X11 input, focus, scaling and packaged sandbox acceptance require their separately authorized environment and are not established by headless tests. Keep baseline, stable tag/SHA, default-branch acceptance and compatibility-reviewed SHA unchanged until that review is complete. No main merge, Omarchy update/install, desktop interruption, publication or Actions activation is part of this proposal.
+
+## Complete relevant entries
+
+- `A` `bin/omarchy-hyprland-corners`
+- `M` `bin/omarchy-hyprland-focus-app`
+- `M` `bin/omarchy-hyprland-monitor-internal`
+- `M` `bin/omarchy-hyprland-monitor-internal-mirror`
+- `M` `bin/omarchy-hyprland-monitor-watch`
+- `A` `bin/omarchy-hyprland-session-lock-stranded`
+- `M` `bin/omarchy-hyprland-window-close-all`
+- `A` `bin/omarchy-hyprland-window-minimize`
+- `M` `bin/omarchy-hyprland-window-single-square-aspect-toggle`
+- `A` `bin/omarchy-hyprland-window-transparency`
+- `M` `bin/omarchy-hyprland-window-width`
+- `A` `bin/omarchy-hyprland-workspace-layout-current`
+- `A` `bin/omarchy-hyprland-workspace-layout-default`
+- `M` `bin/omarchy-hyprland-workspace-layout-toggle`
+- `M` `bin/omarchy-launch-browser`
+- `M` `bin/omarchy-launch-config-editor`
+- `M` `bin/omarchy-launch-openclaw`
+- `M` `bin/omarchy-launch-screensaver`
+- `M` `bin/omarchy-launch-spotify`
+- `M` `bin/omarchy-restart-btop`
+- `M` `bin/omarchy-restart-xcompose`
+- `M` `bin/omarchy-theme-bg-intro`
+- `M` `bin/omarchy-theme-bg-next`
+- `M` `bin/omarchy-theme-bg-set`
+- `M` `bin/omarchy-theme-install`
+- `M` `bin/omarchy-theme-refresh`
+- `M` `bin/omarchy-theme-remove`
+- `M` `bin/omarchy-theme-set`
+- `A` `bin/omarchy-theme-set-fcitx5`
+- `M` `bin/omarchy-theme-set-foot`
+- `A` `bin/omarchy-theme-set-glass`
+- `M` `bin/omarchy-theme-set-hunk`
+- `M` `bin/omarchy-theme-set-keyboard-f16`
+- `M` `bin/omarchy-theme-set-templates`
+- `M` `bin/omarchy-theme-set-tmux`
+- `M` `bin/omarchy-theme-set-vscode`
+- `M` `bin/omarchy-update`
+- `A` `bin/omarchy-update-boot`
+- `M` `bin/omarchy-update-confirm`
+- `M` `bin/omarchy-update-dev`
+- `M` `bin/omarchy-update-keyring`
+- `M` `bin/omarchy-update-orphan-pkgs`
+- `M` `bin/omarchy-update-restart`
+- `M` `bin/omarchy-update-status`
+- `M` `bin/omarchy-update-stay-awake`
+- `M` `bin/omarchy-update-system-pkgs-when-conflicted`
+- `M` `config/hypr/bindings.lua`
+- `M` `config/hypr/input.lua`
+- `M` `default/hypr/apps/bitwarden.lua`
+- `M` `default/hypr/apps/omarchy-shell.lua`
+- `M` `default/hypr/autostart.lua`
+- `M` `default/hypr/bindings/applications.lua`
+- `A` `default/hypr/bindings/dictation.lua`
+- `A` `default/hypr/bindings/input-method.lua`
+- `A` `default/hypr/bindings/jis.lua`
+- `M` `default/hypr/bindings/tiling.lua`
+- `M` `default/hypr/bindings/utilities.lua`
+- `D` `default/hypr/bindings/voxtype.lua`
+- `A` `default/hypr/dictation-backend.lua`
+- `A` `default/hypr/glass.lua`
+- `M` `default/hypr/helpers.lua`
+- `M` `default/hypr/input.lua`
+- `A` `default/hypr/keyboard.lua`
+- `M` `default/hypr/looknfeel.lua`
+- `A` `default/hypr/monitor-workspaces.lua`
+- `M` `default/hypr/omarchy.lua`
+- `M` `default/hypr/startup-cursor.lua`
+- `A` `default/hypr/toggles/bar-glassy.lua`
+- `A` `default/hypr/toggles/corners-rounded.lua`
+- `A` `default/hypr/toggles/corners-sharp.lua`
+- `M` `default/hypr/toggles/no-animations.lua`
+- `A` `default/hypr/toggles/window-glassy.lua`
+- `A` `default/hypr/toggles/window-opaque.lua`
+- `M` `default/hypr/workspace-layouts.lua`
+- `A` `default/hypr/workspace-modes.lua`
+- `M` `install/config/all.sh`
+- `A` `install/config/language.sh`
+- `A` `install/config/locale.sh`
+- `M` `install/hardware/all.sh`
+- `M` `install/hardware/apple/fix-brcmfmac-supplicant.sh`
+- `M` `install/hardware/apple/fix-spi-keyboard.sh`
+- `A` `install/hardware/asus/fix-asus-proart-p14-fkeys.sh`
+- `A` `install/hardware/asus/fix-asus-proart-p14-speakers.sh`
+- `A` `install/hardware/asus/fix-asus-proart-p14-touchpad.sh`
+- `M` `install/hardware/bluetooth.sh`
+- `M` `install/hardware/fix-fkeys.sh`
+- `A` `install/hardware/fix-n1x-gpu-memory.sh`
+- `M` `install/hardware/fix-surface-keyboard.sh`
+- `A` `install/hardware/gb10/sleep.sh`
+- `A` `install/hardware/lenovo/start-yoga-slim7x-remoteprocs.sh`
+- `A` `install/hardware/lenovo/thinkpad-t14s-camera.sh`
+- `A` `install/hardware/lenovo/yoga-slim7x.sh`
+- `A` `install/hardware/n1x.sh`
+- `A` `install/hardware/nvidia-apps.sh`
+- `M` `install/hardware/nvidia.sh`
+- `A` `install/hardware/nvidia/dgx-spark-boot.sh`
+- `A` `install/hardware/platform-setup.sh`
+- `A` `install/hardware/qualcomm/camera.sh`
+- `A` `install/hardware/qualcomm/dtb-uki.sh`
+- `A` `install/hardware/qualcomm/firmware.sh`
+- `A` `install/hardware/qualcomm/initramfs.sh`
+- `A` `install/hardware/qualcomm/kernel-params.sh`
+- `M` `install/hardware/surface.sh`
+- `M` `install/hardware/vulkan.sh`
+- `M` `install/helpers/browser-policy.sh`
+- `A` `install/helpers/image-target.sh`
+- `A` `install/helpers/pacman.sh`
+- `A` `install/omarchy-aarch64-apple.packages`
+- `A` `install/omarchy-aarch64-gb10.packages`
+- `A` `install/omarchy-aarch64-n1x.packages`
+- `A` `install/omarchy-aarch64-qualcomm.packages`
+- `A` `install/omarchy-aarch64.packages`
+- `M` `install/omarchy-base.packages`
+- `M` `install/omarchy-other.packages`
+- `A` `install/omarchy-x86_64-only.packages`
+- `M` `install/post-install/pacman.sh`
+- `A` `install/provisioning/luks-rekey.sh`
+- `A` `install/provisioning/omarchy-provision-hardware.service`
+- `M` `install/provisioning/setup-form.sh`
+- `M` `install/user/all.sh`
+- `M` `install/user/first-run/enable-user-units.sh`
+- `D` `install/user/first-run/install-voxtype.hook`
+- `A` `install/user/hardware/qualcomm/camera.sh`
+- `A` `install/user/hardware/qualcomm/video-decode.sh`
+- `M` `install/user/hardware/vm-no-animations.sh`
+- `A` `install/user/input-method.sh`
+- `A` `install/user/language.sh`
+- `M` `install/user/mise-work.sh`
+- `M` `install/user/mise.sh`
+- `A` `install/user/platform-setup.sh`
+- `M` `install/user/theme.sh`
+- `M` `install/user/xcompose.sh`
+- `M` `test/shell.d/fixtures/startup-cursor/hyprland.lua`
+- `M` `themes/catppuccin-latte/backgrounds/intros/1-color-fade.mp4`
+- `M` `themes/catppuccin-latte/preview.png`
+- `M` `themes/catppuccin/preview.png`
+- `M` `themes/ethereal/backgrounds/intros/1-cosmic.mp4`
+- `D` `themes/ethereal/backgrounds/intros/2-meadow.mp4`
+- `M` `themes/ethereal/preview.png`
+- `M` `themes/everforest/backgrounds/intros/1-tree-tops.mp4`
+- `M` `themes/everforest/preview.png`
+- `A` `themes/flexoki-light/backgrounds/intros/1-orb.mp4`
+- `M` `themes/flexoki-light/preview.png`
+- `D` `themes/gruvbox/backgrounds/intros/1-the-backwater.mp4`
+- `D` `themes/gruvbox/backgrounds/intros/2-flower-basket.mp4`
+- `D` `themes/gruvbox/backgrounds/intros/3-village-square.mp4`
+- `D` `themes/gruvbox/backgrounds/intros/4-idyllic-procession.mp4`
+- `D` `themes/gruvbox/backgrounds/intros/5-leaves.mp4`
+- `M` `themes/gruvbox/preview.png`
+- `M` `themes/hackerman/backgrounds/intros/1-synth-scape.mp4`
+- `D` `themes/hackerman/backgrounds/intros/2-geometric.mp4`
+- `M` `themes/hackerman/preview.png`
+- `D` `themes/kanagawa/backgrounds/intros/1-kanagawa.mp4`
+- `M` `themes/kanagawa/preview.png`
+- `M` `themes/last-horizon/backgrounds/intros/1-eyes-wide.mp4`
+- `D` `themes/last-horizon/backgrounds/intros/2-blink.mp4`
+- `D` `themes/last-horizon/backgrounds/intros/3-bokeh.mp4`
+- `D` `themes/last-horizon/backgrounds/intros/4-new-horizons.mp4`
+- `M` `themes/last-horizon/preview.png`
+- `M` `themes/lumon/preview.png`
+- `D` `themes/lupine/backgrounds/intros/01-cherry-blossom-bokeh.mp4`
+- `D` `themes/lupine/backgrounds/intros/02-cherry-blossom-white.mp4`
+- `D` `themes/lupine/backgrounds/intros/03-pastel-clouds.mp4`
+- `D` `themes/lupine/backgrounds/intros/04-elegant-blue-wave.mp4`
+- `D` `themes/lupine/backgrounds/intros/05-abstract-wave.mp4`
+- `M` `themes/lupine/preview.png`
+- `M` `themes/matte-black/backgrounds/intros/0-ship-at-sea.mp4`
+- `D` `themes/matte-black/backgrounds/intros/1-dark-waters.mp4`
+- `D` `themes/matte-black/backgrounds/intros/2-dot-hands.mp4`
+- `M` `themes/matte-black/preview.png`
+- `M` `themes/miasma/backgrounds/intros/01-nature-of-fear.mp4`
+- `D` `themes/miasma/backgrounds/intros/02-crowned.mp4`
+- `M` `themes/miasma/preview.png`
+- `M` `themes/nord/backgrounds/intros/0-black-moon.mp4`
+- `D` `themes/nord/backgrounds/intros/1-city-view.mp4`
+- `D` `themes/nord/backgrounds/intros/2-night-hawks.mp4`
+- `M` `themes/nord/preview.png`
+- `M` `themes/osaka-jade/backgrounds/intros/1-glowing-city.mp4`
+- `D` `themes/osaka-jade/backgrounds/intros/2-shaded-entrance.mp4`
+- `D` `themes/osaka-jade/backgrounds/intros/3-mountain-moon.mp4`
+- `M` `themes/osaka-jade/preview.png`
+- `M` `themes/retro-82/backgrounds/intros/1-in-the-groove.mp4`
+- `D` `themes/retro-82/backgrounds/intros/2-dusk-guardian.mp4`
+- `D` `themes/retro-82/backgrounds/intros/3-glassy-lines.mp4`
+- `D` `themes/retro-82/backgrounds/intros/4-gateway.mp4`
+- `D` `themes/retro-82/backgrounds/intros/5-zen-boat.mp4`
+- `D` `themes/retro-82/backgrounds/intros/6-abstract-pyramids.mp4`
+- `D` `themes/retro-82/backgrounds/intros/7-the-journey.mp4`
+- `D` `themes/retro-82/backgrounds/intros/8-glitter-glass.mp4`
+- `M` `themes/retro-82/preview.png`
+- `M` `themes/ristretto/backgrounds/intros/0-launch.mp4`
+- `D` `themes/ristretto/backgrounds/intros/1-color-curves.mp4`
+- `D` `themes/ristretto/backgrounds/intros/2-coffee-beans.mp4`
+- `D` `themes/ristretto/backgrounds/intros/3-industrial-moon.mp4`
+- `M` `themes/ristretto/preview.png`
+- `D` `themes/rose-pine/backgrounds/intros/2-dot-map.mp4`
+- `D` `themes/rose-pine/backgrounds/intros/3-omarchy-plants.mp4`
+- `M` `themes/rose-pine/preview.png`
+- `D` `themes/solitude/backgrounds/intros/1-on-pole.mp4`
+- `D` `themes/solitude/backgrounds/intros/2-wreakage.mp4`
+- `D` `themes/solitude/backgrounds/intros/3-climb.mp4`
+- `D` `themes/solitude/backgrounds/intros/4-ether.mp4`
+- `D` `themes/solitude/backgrounds/intros/5-eyed.mp4`
+- `M` `themes/solitude/preview.png`
+- `A` `themes/starship/backgrounds/1-starbase.webp`
+- `A` `themes/starship/backgrounds/2-flight14-dawn.webp`
+- `A` `themes/starship/backgrounds/3-engine-cluster.webp`
+- `A` `themes/starship/backgrounds/4-morning-pad.webp`
+- `A` `themes/starship/colors.toml`
+- `A` `themes/starship/preview.png`
+- `A` `themes/tokyo-night/backgrounds/0-liftoff.webp`
+- `R100` `themes/tokyo-night/backgrounds/0-winding-road.webp` → `themes/tokyo-night/backgrounds/1-winding-road.webp`
+- `R100` `themes/tokyo-night/backgrounds/1-quattro.webp` → `themes/tokyo-night/backgrounds/2-quattro.webp`
+- `R100` `themes/tokyo-night/backgrounds/2-swirl-buck.webp` → `themes/tokyo-night/backgrounds/3-swirl-buck.webp`
+- `R100` `themes/tokyo-night/backgrounds/3-sunset-lake.webp` → `themes/tokyo-night/backgrounds/4-sunset-lake.webp`
+- `R100` `themes/tokyo-night/backgrounds/4-omakub.webp` → `themes/tokyo-night/backgrounds/5-omakub.webp`
+- `R100` `themes/tokyo-night/backgrounds/5-oma-cityscape.jpg` → `themes/tokyo-night/backgrounds/6-oma-cityscape.jpg`
+- `R100` `themes/tokyo-night/backgrounds/6-oma.webp` → `themes/tokyo-night/backgrounds/7-oma.webp`
+- `D` `themes/tokyo-night/backgrounds/intros/0-winding-road.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/1-quattro.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/2-swirl-buck.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/3-sunset-lake.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/4-omakub.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/5-oma-cityscape.mp4`
+- `D` `themes/tokyo-night/backgrounds/intros/6-oma.mp4`
+- `M` `themes/tokyo-night/preview.png`
+- `M` `themes/vantablack/backgrounds/intros/0-dot-hands.mp4`
+- `D` `themes/vantablack/backgrounds/intros/1-twisted-stairs.mp4`
+- `D` `themes/vantablack/backgrounds/intros/2-layers-deep.mp4`
+- `D` `themes/vantablack/backgrounds/intros/3-layers-stacked.mp4`
+- `M` `themes/vantablack/preview.png`
+- `M` `themes/white/backgrounds/intros/1-white.mp4`
+- `D` `themes/white/backgrounds/intros/2-white.mp4`
+- `D` `themes/white/backgrounds/intros/3-white.mp4`
+- `M` `themes/white/preview.png`
+
+Final canonical validation commands, candidate SHA and exact results are recorded in the draft PR and external ledger after execution.
