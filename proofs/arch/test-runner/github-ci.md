@@ -8,6 +8,10 @@ Proves [specs/arch/test-runner/github-ci.md](../../../specs/arch/test-runner/git
 
 Coverage declarations are carried inside the migrated assertion blocks below. PR concurrency is a parsed-YAML contract: it verifies the configuration sent to GitHub without simulating the service’s scheduler or cancellation behavior.
 
+## Disabled-Actions fork applicability
+
+The [shared-branch fork exception](../../../specs/spec-workflow.md#^fork-disabled-actions-validation) is a contribution policy checked by review, not an alternative CI implementation. For `Gberfield/television`, review must confirm the owner's disabled-Actions instruction, fresh repository Actions and target required-check state, and a complete canonical verification record bound to the final pushed head and current target. The record retains provider, failures, skips, recovered flakes, leaks and infrastructure limits. Local reports cannot establish a hosted job, scheduler behavior, cache/artifact service behavior, or attestation eligibility. Any required status check still applies, and head/target movement invalidates the prior full-validation result. Existing CI-specific operational assertions below retain their evidence requirements; none is discharged by this policy exception. No additional test is ordered for this human-governed applicability decision.
+
 ## Test hooks
 
 
