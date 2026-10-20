@@ -28,7 +28,10 @@
     "proofs/product/artifact-navigation.md",
     "specs/index.md",
     "storybook/package.json",
-    "review-required: .github/workflows/ci.yml"
+    "review-required: .github/actions/setup-shard-readiness/action.yml",
+    "review-required: .github/actions/setup-workspace/action.yml",
+    "review-required: .github/workflows/ci.yml",
+    "review-required: specs/arch/updates/update-channel.json"
   ],
   "compatibility": null,
   "mode": "report-only",
