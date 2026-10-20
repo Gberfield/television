@@ -84,13 +84,13 @@ export interface LaunchedDesktop {
 
 
 /** Real pointer activation through the visible embedder, with guest receipt. */
-export async function clickVisibleWebviewLink(
+export async function clickVisibleWebviewElement(
   app: ElectronApplication,
   page: Page,
   selector: string,
   button: "left" | "middle" = "left",
 ): Promise<void> {
-  const frame = page.locator(".artifact-view webview.artifact-content:visible");
+  const frame = page.locator(".page[selected] .artifact-view webview.artifact-content:visible");
   await expect(frame).toHaveCount(1);
   const guestID = await frame.evaluate((element) =>
     (element as Electron.WebviewTag).getWebContentsId()
@@ -114,7 +114,7 @@ export async function clickVisibleWebviewLink(
     return await guest.executeJavaScript(`(() => {
       const selector = ${JSON.stringify(input.selector)};
       const target = document.querySelector(selector);
-      if (!target) throw new Error("Visible link not found");
+      if (!target) throw new Error("Visible target not found");
       const rect = target.getBoundingClientRect();
       const receipt = { events: [] };
       const types = ["mousedown", "mouseup", ${JSON.stringify(input.activation)}];
@@ -154,6 +154,9 @@ export async function clickVisibleWebviewLink(
     }, guestID);
   }
 }
+
+// Keep existing link callers on the same trusted pointer path.
+export { clickVisibleWebviewElement as clickVisibleWebviewLink };
 
 function desktopLaunchEnv(overrides: Record<string, string | undefined> = {}): Record<string, string> {
   const env: Record<string, string> = {};

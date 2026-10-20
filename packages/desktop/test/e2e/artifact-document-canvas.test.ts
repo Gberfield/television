@@ -4,16 +4,24 @@ import os from "node:os";
 import path from "node:path";
 import type { Artifact } from "@telepath-computer/television-artifact";
 import { TelevisionClient } from "@telepath-computer/television-shared";
+import { startMotionObservation } from "../../../web/test/e2e/helpers.ts";
 import { startConnectTestServer } from "./connect-server.ts";
-import { launchDesktop } from "./helpers.ts";
+import { clickVisibleWebviewElement, launchDesktop } from "./helpers.ts";
 
 async function pixel(app: ElectronApplication, page: Page, x: number, y: number): Promise<number[]> {
   const image = (await page.screenshot({ scale: "css" })).toString("base64");
-  return app.evaluate(({ nativeImage }, { image, x, y }) => {
-    const bitmap = nativeImage.createFromBuffer(Buffer.from(image, "base64"))
-      .crop({ x, y, width: 1, height: 1 }).toBitmap();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  return app.evaluate(({ nativeImage }, { image, x, y, viewport }) => {
+    // Electron can return device pixels despite Playwright's CSS-scale option.
+    const raster = nativeImage.createFromBuffer(Buffer.from(image, "base64"));
+    const size = raster.getSize();
+    const bitmap = raster.crop({
+      x: Math.round(x * size.width / viewport.width),
+      y: Math.round(y * size.height / viewport.height),
+      width: 1, height: 1,
+    }).toBitmap();
     return [bitmap[2], bitmap[1], bitmap[0]];
-  }, { image, x, y });
+  }, { image, x, y, viewport });
 }
 
 // proofs/ui/app/artifact-frame/index.md#^af-ui-ac-document-canvas
@@ -48,22 +56,20 @@ for (const dpr of [1, 2]) test(`native document canvas preserves default and aut
     const evaluateGuest = (id: number, expression: string) => app!.evaluate(
       ({ webContents }, { id, expression }) => webContents.fromId(id)!.executeJavaScript(expression), { id, expression });
     for (const [index, fixture] of fixtures.entries()) {
+      const motion = await startMotionObservation(page, ".stage");
       await client.display.focus({ artifactID: artifacts[index].id });
       await expect(page.locator(".page[selected]")).toHaveAttribute("data-page-key", artifacts[index].id);
+      await motion.settle();
       const guestID = async () => app!.evaluate(({ webContents }, id) => webContents.getAllWebContents()
         .find(contents => contents.getType() === "webview" && !contents.isLoadingMainFrame() && contents.getURL().includes(`/artifact/${id}/`))?.id, artifacts[index].id);
       await expect.poll(guestID).toBeTruthy();
       const id = (await guestID())!;
       await expect.poll(() => evaluateGuest(id, "document.readyState")).toBe("complete");
-      const rect = await evaluateGuest(id, '(() => { const r=document.querySelector("input").getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; })()');
-      await app.evaluate(({ webContents }, { id, rect }) => {
+      await clickVisibleWebviewElement(app, page, 'input[aria-label="Draft"]');
+      await app.evaluate(({ webContents }, id) => {
         const guest = webContents.fromId(id)!;
-        guest.focus();
-        const x = Math.round(rect.x + rect.width / 2), y = Math.round(rect.y + rect.height / 2);
-        guest.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
-        guest.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 });
         for (const character of "State retained") guest.sendInputEvent({ type: "char", keyCode: character });
-      }, { id, rect });
+      }, id);
       await expect.poll(() => evaluateGuest(id, 'document.querySelector("input").value')).toBe("State retained");
       const loadID = await evaluateGuest(id, "document.documentElement.dataset.loadId");
       expect(loadID).toBeTruthy();
