@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #25.** This implementation plan was followed for source integration, with graphical compatibility blocked and the later owner-accepted fork policy changing when live Mac/provider evidence is due. It preserves the coherent two-slice integration and compatibility plan, including proof-derived validation and preservation boundaries, that the final diff does not reconstruct. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Implementation plan
 
 Derived from the converged assembled spec tree and imported/reconciled proofs. Review proof convergence before accepting this plan. Human acceptance of all final spec deltas remains due before a shared merge.

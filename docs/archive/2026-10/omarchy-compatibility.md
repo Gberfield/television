@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #25.** This source assessment informed the compatibility handoff; graphical acceptance remained blocked, and the current runnable matrix is maintained in docs/guides/linux-omarchy-acceptance.md. It preserves the assessed browser, focus, workspace, GPU and theme interactions at the original immutable observations, which the Television source diff alone cannot reconstruct. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Omarchy compatibility review and test matrix
 
 ## Scope and evidence limits
