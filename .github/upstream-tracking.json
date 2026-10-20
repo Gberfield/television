@@ -14,8 +14,11 @@
     "stable_tag": "v4.0.4",
     "stable_sha": "c668141e9c42b13c80c9ca4ea108e11708c5e8a5",
     "baseline_sha": "902fd8aebd98b6eedaa58276886a2f9f2876755f",
-    "observed_sha": "902fd8aebd98b6eedaa58276886a2f9f2876755f",
-    "compatibility_reviewed_sha": null
+    "observed_sha": "3ac43659dcbf88e84d951e3ce979b48a60a7d1f2",
+    "compatibility_reviewed_sha": null,
+    "observed_stable_tag": "v4.0.6",
+    "observed_stable_sha": "237f1b4071a0bff2296c6d740ba2b9fd695ebfa0",
+    "observed_default_branch": "quattro"
   },
   "policy": {
     "draft_only": true,
