@@ -26,7 +26,7 @@ For [ancestry and version preservation](../../../specs/arch/updates/upstream-tra
 
 ## Validation boundaries
 
-For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tracking-validation), “separates read-only discovery” and “validates draft sync branches” assert YAML permissions, draft triggers, actual tests, absent deploy secrets/write jobs and nonpersisted checkout credentials. The initial disabled PR-writing capability is explicitly documented; these assertions do not grant it. Actual full hosted checks must run at the final candidate SHA before acceptance. ^tracking-t-validation
+For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tracking-validation), “separates read-only discovery” and “validates draft sync branches” assert YAML permissions, manual-only triggers, actual tests, absent deploy secrets/write jobs and nonpersisted checkout credentials. The trigger contract rejects both scheduled tracking and automatic sync-push validation. The initial disabled PR-writing capability is explicitly documented; these assertions do not grant it. Actual full hosted checks must run at the final candidate SHA before acceptance. ^tracking-t-validation
 
 ## Local discovery adapter
 
