@@ -1,4 +1,4 @@
-*Synthetic Git and workflow contracts for downstream tracking, with hosted checks recorded separately.*
+*Synthetic tracking contracts and exact-revision source validation, with hosted operational claims kept separate.*
 
 # Fork upstream tracking proof
 
@@ -8,7 +8,7 @@ Proves [specs/arch/updates/upstream-tracking.md](../../../specs/arch/updates/ups
 
 Synthetic contracts distinguish observed and integrated Television identities and Omarchy stable/default-branch changes. A path predicate determines relevant compatibility inputs; no hosted API is mocked as evidence of its authorization behavior. Temporary Git repositories exercise real merges, parents, version restoration, dependency updates, content conflicts and unsafe manifest handling. These contain only synthetic files and never run fetched application code.
 
-Workflow YAML contracts prove the submitted permissions, triggers, credential persistence and publication gates. They honor the spec's synthetic-testing guidance but do not emulate GitHub's scheduler, token approvals, transport leases or PR API. The create-only lease relies on Git; operational proof comes from actual owner-authorized draft publication and final-SHA hosted validation. Hosted run URLs belong in the draft PR. Existing Linux/Hyprland and Omarchy-theme tests remain the compatibility contracts; hosted synthetic suites do not establish physical desktop interaction or acceptance of a new Omarchy revision.
+Workflow YAML contracts prove the submitted permissions, triggers, credential persistence and publication gates. They honor the spec's synthetic-testing guidance but do not emulate GitHub's scheduler, token approvals, transport leases or PR API. The create-only lease relies on Git; operational proof of publication comes from actual owner-authorized draft publication. Exact-revision source validation follows the applicable fork policy: full canonical verification of the final pushed head containing the current target can validate a sync candidate while Actions is intentionally disabled and the target has no required status checks. The draft PR records that result and retained local evidence; hosted run URLs are required only for claims that depend on hosted execution. Existing Linux/Hyprland and Omarchy-theme tests remain the compatibility contracts; hosted synthetic suites do not establish physical desktop interaction or acceptance of a new Omarchy revision.
 
 ## Test hooks
 
@@ -26,7 +26,7 @@ For [ancestry and version preservation](../../../specs/arch/updates/upstream-tra
 
 ## Validation boundaries
 
-For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tracking-validation), “separates read-only discovery” and “validates draft sync branches” assert YAML permissions, manual-only triggers, actual tests, absent deploy secrets/write jobs and nonpersisted checkout credentials. The trigger contract rejects both scheduled tracking and automatic sync-push validation. The initial disabled PR-writing capability is explicitly documented; these assertions do not grant it. Acceptance of an actual upstream sync candidate requires full hosted checks at its final candidate SHA. Local validation of a manual-trigger maintenance contribution under the [disabled-Actions fork policy](../../../specs/spec-workflow.md#^fork-disabled-actions-validation) does not claim that candidate acceptance or prove hosted scheduling or permission behavior. ^tracking-t-validation
+For [credential separation](../../../specs/arch/updates/upstream-tracking.md#^tracking-validation), “separates read-only discovery” and “validates draft sync branches” assert YAML permissions, manual-only triggers, actual tests, absent deploy secrets/write jobs and nonpersisted checkout credentials. The trigger contract rejects both scheduled tracking and automatic sync-push validation. The initial disabled PR-writing capability is explicitly documented; these assertions do not grant it. Source validation of an actual upstream sync candidate may use full canonical verification under the [disabled-Actions fork policy](../../../specs/spec-workflow.md#^fork-disabled-actions-validation), including its final pushed-head/current-target and evidence requirements. Review verifies policy applicability and the complete runner reports; no synthetic test substitutes for an actual full run. This is not hosted scheduler or permission evidence, a durable local attestation, physical compatibility acceptance or an automatic manifest update. Separately required operational checks and human integration/compatibility review remain in force. ^tracking-t-validation
 
 ## Local discovery adapter
 

@@ -14,8 +14,8 @@ Archive contents may be deleted periodically; Git history preserves them with th
   palette following, durable repair, ownership, logs and disabling.
 - [Theme authoring record](../contrib/omarchy-theme/theme/README.md): color mapping,
   atomic writes, activation retry, runtime files and permanent repair source.
-- [Upstream tracking](guides/upstream-tracking.md): activated draft automation,
-  manual detection/validation, compatibility review and merge boundaries.
+- [Upstream tracking](guides/upstream-tracking.md): manual local validation and
+  read-only discovery, compatibility review and retained hosted boundaries.
 - [Administrator guide](guides/television-admin-guide.md): server, skills, access,
   connection and upgrades. Editing this fork's source does not deploy the public
   guide at `https://television.run/install.md`.
