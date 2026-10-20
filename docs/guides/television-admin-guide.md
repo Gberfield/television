@@ -240,6 +240,12 @@ reviewed artifact-isolation version transition; source changes do not publish or
 install a desktop release. Use the selected release's checksums/build information when verifying a
 payload. These are downstream releases, not official Telepath Mac or npm releases.
 
+This source server requires desktop 1.5.0 or newer for artifact isolation. The
+listed Linux 1.4.27 client does not meet that floor. Do not pair its installation
+with an upgrade to this source server; use the web client until a compatible
+Linux desktop has passed acceptance and is available. This source change does
+not publish or install that desktop.
+
 For the portable archive, extract the whole folder, open **Install
 Television.desktop** (allow execution/trust when prompted), then launch
 **Television**. The installer needs no administrator privileges and preserves

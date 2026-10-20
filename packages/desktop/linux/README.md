@@ -13,6 +13,14 @@ version transition; building this source does not reproduce the published
 1.4.27 payload or publish a new release automatically. The [fork overview](../../../docs/guides/fork-overview.md)
 explains the separate versions and recent changes.
 
+This source server requires desktop **1.5.0 or newer** for artifact isolation.
+The published **1.4.27** client linked below is blocked by that server's upgrade
+gate. Use
+the web client until a compatible Linux desktop has passed acceptance and is
+available; preparing source 1.5.4 does not publish or install one. Treat the
+1.4.27 download/install instructions below as instructions for that existing
+release, not a compatible pairing with this new source server.
+
 ## Install and connect
 
 For the portable archive, download `Television-1.4.27-linux-x64.tar.gz` and extract

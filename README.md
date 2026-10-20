@@ -80,6 +80,10 @@ These commands build this fork's source workspace, version 1.5.4;
 the published Linux desktop 1.4.27 is a separately stamped distribution. To build
 the client, follow [Linux packaging](packages/desktop/linux/README.md#build-and-verification).
 Updating source or the server does not publish or install a desktop release.
+This server requires desktop 1.5.0 or newer for artifact isolation; the published
+Linux 1.4.27 client does not meet that floor. Use the web client until a compatible
+Linux desktop has passed acceptance and is available; this source change does not
+publish or install one.
 
 ## Community
 

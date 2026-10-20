@@ -18,6 +18,12 @@ the earlier accepted tray source `43391068b7d90c933ace1042a03ca56e1f5b5f29` with
 distribution stamps. A larger release number does not mean it contains every
 later source commit.
 
+This source server requires desktop **1.5.0 or newer** for artifact isolation.
+The published Linux **1.4.27** client is incompatible with that server version.
+Use the web client until a compatible Linux desktop has passed acceptance and
+is available. The prepared source 1.5.4 is not itself an accepted published
+desktop release; no installed server or client is changed by this draft.
+
 The [linux-stable release](https://github.com/Gberfield/television/releases/tag/linux-stable)
 holds versioned portable archives and AppImages, checksums, update metadata and
 build information. Source merges do not update these payloads, npm, the Mac app,
