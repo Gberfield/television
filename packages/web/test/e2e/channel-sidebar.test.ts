@@ -134,30 +134,84 @@ async function scrollList(page: Page, top: number): Promise<number> {
 async function sampleSidebarScrollFrames(
   page: Page,
   frameCount: number,
+  pointerMove?: { x: number; y: number },
 ): Promise<SidebarScrollFrameSample[]> {
-  return page.evaluate((count) => new Promise((resolve) => {
-    const samples: SidebarScrollFrameSample[] = [];
-    const sample = (timestamp: number): void => {
-      const body = document.querySelector<HTMLElement>(".sidebar-body");
-      if (!body) throw new Error("Expected a rendered channel sidebar body");
-      const placeholder = document.querySelector<HTMLElement>(
-        ".channel-group:not(.channel-group-withdrawal) .channel-placeholder",
-      );
-      samples.push({
-        timestamp,
-        scrollTop: body.scrollTop,
-        placeholderIndex: placeholder === null
-          ? null
-          : Number(placeholder.dataset.channelIndex),
-      });
-      if (samples.length >= count) {
-        resolve(samples);
+  // Arm before dispatch: the browser can reach an edge before the driver's
+  // mouse command returns. The real pointer event starts the recorder after
+  // the application's already-registered pointer handler schedules its frame.
+  const observation = await page.evaluateHandle(({ count, afterPointerMove }) => ({
+    samples: new Promise<SidebarScrollFrameSample[]>((resolve, reject) => {
+      const samples: SidebarScrollFrameSample[] = [];
+      const sample = (timestamp: number): void => {
+        const body = document.querySelector<HTMLElement>(".sidebar-body");
+        if (!body) {
+          reject(new Error("Expected a rendered channel sidebar body"));
+          return;
+        }
+        const placeholder = document.querySelector<HTMLElement>(
+          ".channel-group:not(.channel-group-withdrawal) .channel-placeholder",
+        );
+        samples.push({
+          timestamp,
+          scrollTop: body.scrollTop,
+          placeholderIndex: placeholder === null
+            ? null
+            : Number(placeholder.dataset.channelIndex),
+        });
+        if (samples.length >= count) {
+          resolve(samples);
+        } else {
+          requestAnimationFrame(sample);
+        }
+      };
+      const start = (): void => { requestAnimationFrame(sample); };
+      if (afterPointerMove) {
+        window.addEventListener("pointermove", start, { once: true });
       } else {
-        requestAnimationFrame(sample);
+        start();
       }
-    };
-    requestAnimationFrame(sample);
-  }), frameCount);
+    }),
+  }), { count: frameCount, afterPointerMove: pointerMove !== undefined });
+  try {
+    if (pointerMove) await page.mouse.move(pointerMove.x, pointerMove.y);
+    return await observation.evaluate(({ samples }) => samples);
+  } finally {
+    await observation.dispose();
+  }
+}
+
+async function stopActiveSidebarScroll(
+  page: Page,
+  eventType: "pointermove" | "pointerup",
+  stop: () => Promise<void>,
+): Promise<number> {
+  // Capture before the application's bubbling handler stops the real gesture.
+  const observation = await page.evaluateHandle((type) => ({
+    position: new Promise<{ scrollTop: number; maximum: number; trusted: boolean }>((resolve, reject) => {
+      window.addEventListener(type, (event) => {
+        const body = document.querySelector<HTMLElement>(".sidebar-body");
+        if (!body) {
+          reject(new Error("Expected a rendered channel sidebar body at the stop event"));
+          return;
+        }
+        resolve({
+          scrollTop: body.scrollTop,
+          maximum: body.scrollHeight - body.clientHeight,
+          trusted: event.isTrusted,
+        });
+      }, { once: true, capture: true });
+    }),
+  }), eventType);
+  try {
+    await stop();
+    const position = await observation.evaluate(({ position }) => position);
+    expect(position.trusted).toBe(true);
+    expect(position.scrollTop).toBeGreaterThan(0.5);
+    expect(position.scrollTop).toBeLessThan(position.maximum - 0.5);
+    return position.scrollTop;
+  } finally {
+    await observation.dispose();
+  }
 }
 
 function sidebarScrollVelocity(
@@ -1130,7 +1184,7 @@ test.describe("channel sidebar rendered drag choreography (^sb-ac-drag)", () => 
 test.describe("channel sidebar drag edge scroll (^sb-ac-drag-scroll)", () => {
   test("tapers both edge velocities, tracks newly revealed rows, and stops outside, on release, or without overflow", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.setViewportSize({ width: 1100, height: 320 });
+    await page.setViewportSize({ width: 1100, height: 200 });
     await openFixture(page, true);
     await page.evaluate(async ({ channelIds, focusedId }) => {
       await window.__channelSidebarFixture.setState(channelIds, channelIds, focusedId);
@@ -1160,20 +1214,20 @@ test.describe("channel sidebar drag edge scroll (^sb-ac-drag-scroll)", () => {
     );
     const bottomOuterY = bodyBottom - 0.5;
     const expectedOuterVelocity = 800 * (28 - (bodyBottom - bottomOuterY)) / 28;
-    await page.mouse.move(x, bottomOuterY);
-    const outerSamples = await sampleSidebarScrollFrames(page, 10);
+    const outerSamples = await sampleSidebarScrollFrames(page, 10, { x, y: bottomOuterY });
     const outerVelocity = sidebarScrollVelocity(outerSamples, maximumScrollTop);
     expectSidebarVelocityNear(outerVelocity, expectedOuterVelocity);
-    expect(outerSamples.slice(1).every((sample, index) =>
-      sample.scrollTop > outerSamples[index]!.scrollTop
-    )).toBe(true);
+    expect(outerSamples.slice(1).every((sample, index) => {
+      const previous = outerSamples[index]!.scrollTop;
+      return sample.scrollTop > previous ||
+        (previous >= maximumScrollTop - 0.5 && sample.scrollTop === previous);
+    }), JSON.stringify(outerSamples)).toBe(true);
 
     await page.mouse.move(x, bodyBottom - 28.5);
     await sampleSidebarScrollFrames(page, 2);
     await scrollList(page, 0);
     const bottomMiddleY = bodyBottom - 14;
-    await page.mouse.move(x, bottomMiddleY);
-    const middleSamples = await sampleSidebarScrollFrames(page, 10);
+    const middleSamples = await sampleSidebarScrollFrames(page, 10, { x, y: bottomMiddleY });
     const middleVelocity = sidebarScrollVelocity(middleSamples, maximumScrollTop);
     expectSidebarVelocityNear(middleVelocity, 400);
     expect(middleVelocity).toBeGreaterThan(outerVelocity * 0.35);
@@ -1185,16 +1239,14 @@ test.describe("channel sidebar drag edge scroll (^sb-ac-drag-scroll)", () => {
     const bottomNearInnerY = Math.floor(bodyBottom - 28) + 1;
     const expectedNearInnerVelocity = 800 *
       (bottomNearInnerY - (bodyBottom - 28)) / 28;
-    await page.mouse.move(x, bottomNearInnerY);
-    const nearInnerSamples = await sampleSidebarScrollFrames(page, 60);
+    const nearInnerSamples = await sampleSidebarScrollFrames(page, 60, { x, y: bottomNearInnerY });
     const nearInnerVelocity = sidebarScrollVelocity(nearInnerSamples, maximumScrollTop);
     expectSidebarVelocityNear(nearInnerVelocity, expectedNearInnerVelocity);
     expect(nearInnerVelocity).toBeGreaterThan(0);
     expect(nearInnerVelocity).toBeLessThan(middleVelocity * 0.15);
 
-    await page.mouse.move(x, bottomOuterY);
-    await scrollList(page, 0);
     await page.mouse.move(x, bodyBottom - 28.5);
+    await scrollList(page, 0);
     const beforeReveal = await report(page);
     const startIndex = beforeReveal.drag.placeholder?.index;
     if (startIndex === undefined || startIndex === null) {
@@ -1205,31 +1257,31 @@ test.describe("channel sidebar drag edge scroll (^sb-ac-drag-scroll)", () => {
     expect(revealed.scrollTop).toBeGreaterThan(outerSamples[0]!.scrollTop);
     expect(revealed.placeholderIndex).toBeGreaterThanOrEqual(startIndex + 2);
 
-    await page.mouse.move(x, bodyBottom - 28.5);
+    const exitPosition = await stopActiveSidebarScroll(page, "pointermove", () =>
+      page.mouse.move(x, bodyBottom - 28.5)
+    );
     const stoppedSamples = await sampleSidebarScrollFrames(page, 6);
     expect(Math.abs(sidebarScrollVelocity(stoppedSamples))).toBeLessThan(1);
+    expect(stoppedSamples.every(({ scrollTop }) => Math.abs(scrollTop - exitPosition) < 0.5)).toBe(true);
 
-    await scrollList(page, maximumScrollTop);
     await page.mouse.move(x, bodyBox.y + 28.5);
+    await scrollList(page, maximumScrollTop);
     const topMiddleY = bodyBox.y + 14;
-    await page.mouse.move(x, topMiddleY);
-    const topMiddleSamples = await sampleSidebarScrollFrames(page, 10);
+    const topMiddleSamples = await sampleSidebarScrollFrames(page, 10, { x, y: topMiddleY });
     const topMiddleVelocity = sidebarScrollVelocity(topMiddleSamples, maximumScrollTop);
     expectSidebarVelocityNear(topMiddleVelocity, -400);
 
-    await scrollList(page, maximumScrollTop);
     await page.mouse.move(x, bodyBox.y + 28.5);
+    await scrollList(page, maximumScrollTop);
     const topOuterY = bodyBox.y + 0.5;
     const expectedTopOuterVelocity = -800 * (28 - (topOuterY - bodyBox.y)) / 28;
-    await page.mouse.move(x, topOuterY);
-    const topOuterSamples = await sampleSidebarScrollFrames(page, 10);
+    const topOuterSamples = await sampleSidebarScrollFrames(page, 10, { x, y: topOuterY });
     const topOuterVelocity = sidebarScrollVelocity(topOuterSamples, maximumScrollTop);
     expectSidebarVelocityNear(topOuterVelocity, expectedTopOuterVelocity);
 
-    await scrollList(page, maximumScrollTop);
     await page.mouse.move(x, bodyBox.y + 28.5);
-    await page.mouse.move(x, topMiddleY);
-    const secondTopMiddleSamples = await sampleSidebarScrollFrames(page, 10);
+    await scrollList(page, maximumScrollTop);
+    const secondTopMiddleSamples = await sampleSidebarScrollFrames(page, 10, { x, y: topMiddleY });
     const secondTopMiddleVelocity = sidebarScrollVelocity(
       secondTopMiddleSamples,
       maximumScrollTop,
@@ -1244,13 +1296,14 @@ test.describe("channel sidebar drag edge scroll (^sb-ac-drag-scroll)", () => {
 
     // Release while the loop is still active in the top zone. The gesture's
     // common finish path, rather than a preceding zone exit, must stop it.
-    await page.mouse.up();
+    const releasePosition = await stopActiveSidebarScroll(page, "pointerup", () => page.mouse.up());
     await expect.poll(async () => (await report(page)).drag.carriedId).toBeNull();
     const released = await report(page);
+    expect(Math.abs((released.drag.scrollTop ?? 0) - releasePosition)).toBeLessThan(0.5);
     const afterReleaseSamples = await sampleSidebarScrollFrames(page, 6);
     expect(Math.abs(sidebarScrollVelocity(afterReleaseSamples))).toBeLessThan(1);
     expect(afterReleaseSamples.every(({ scrollTop }) =>
-      Math.abs(scrollTop - (released.drag.scrollTop ?? 0)) < 0.5
+      Math.abs(scrollTop - releasePosition) < 0.5
     )).toBe(true);
     const settledMotion = await motion.settle({ requireMotion: true });
     expect(settledMotion.scrollEvents).toBeGreaterThan(0);
