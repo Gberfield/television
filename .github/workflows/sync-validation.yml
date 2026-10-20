@@ -1,10 +1,10 @@
 # Read-only draft validation; no publication, attestation writer or deployment secrets.
 name: Sync validation
 
+# Validate an exact selected sync branch by explicit manual dispatch.
+# Ordinary ready PR validation remains in ci.yml.
 on:
   workflow_dispatch:
-  push:
-    branches: ['sync/**']
 
 permissions:
   contents: read

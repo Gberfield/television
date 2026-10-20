@@ -1,7 +1,7 @@
 name: Track upstream updates
+# Fork background work is opt-in: a maintainer dispatches this workflow.
+# Keep repository Actions disabled until its compute policy is reviewed.
 on:
-  schedule:
-    - cron: '37 6 * * *'
   workflow_dispatch:
 permissions:
   contents: read

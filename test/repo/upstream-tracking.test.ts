@@ -51,7 +51,7 @@ const workflow = (name: string) => parseYaml(readFileSync(`.github/workflows/${n
 describe("sync workflow trust boundaries", () => {
   it("separates read-only discovery from the only PR writer", () => {
     const config = workflow("upstream-tracking");
-    expect(config.on.schedule).toHaveLength(1);
+    expect(Object.keys(config.on)).toEqual(["workflow_dispatch"]);
     expect(config.on.workflow_dispatch).toBeNull();
     expect(config.permissions).toEqual({ contents: "read" });
     expect(config.jobs.detect.permissions).toBeUndefined();
@@ -61,7 +61,8 @@ describe("sync workflow trust boundaries", () => {
   });
   it("validates draft sync branches with actual tests and no write/deploy capability", () => {
     const config = workflow("sync-validation");
-    expect(config.on.push.branches).toEqual(["sync/**"]);
+    expect(Object.keys(config.on)).toEqual(["workflow_dispatch"]);
+    expect(config.on.workflow_dispatch).toBeNull();
     expect(config.permissions).toEqual({ contents: "read" });
     expect(config.jobs["attest-write"]).toBeUndefined();
     expect(config.jobs["attest-check"].outputs.skip).toBe("false");
