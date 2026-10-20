@@ -127,16 +127,21 @@ describe("duration-aware shard planning", () => {
       baselineBytes: serializeTimingBaseline({ schemaVersion: 1, sourceThrough: null, files: {} }).toString("base64"),
       timingProvider: provider, testedCommit: commit, testedTree: tree, shardTotal: 8,
     };
-    const program = `import {createShardPlan} from ${JSON.stringify(pathToFileUrl(modulePath))};const i=JSON.parse(Buffer.from(process.argv[1],"base64"));i.baselineBytes=Buffer.from(i.baselineBytes,"base64");const p=createShardPlan(i);process.stdout.write(JSON.stringify(p));`;
+    const program = `import {createShardPlan} from ${JSON.stringify(pathToFileUrl(modulePath))};const i=JSON.parse(Buffer.from(process.argv[1],"base64"));i.baselineBytes=Buffer.from(i.baselineBytes,"base64");const started=performance.now();const p=createShardPlan(i);const planningMs=performance.now()-started;process.stdout.write(JSON.stringify({serializedPlan:JSON.stringify(p),planningMs}));`;
     const encoded = Buffer.from(JSON.stringify(input)).toString("base64");
     const outputs: Buffer[] = [];
     const times: number[] = [];
     for (let index = 0; index < 50; index += 1) {
-      const started = performance.now();
       const result = spawnSync(process.execPath, ["--input-type=module", "-e", program, encoded], { maxBuffer: 2 * 1024 * 1024 });
-      times.push(performance.now() - started);
       expect(result.status, result.stderr.toString()).toBe(0);
-      outputs.push(result.stdout);
+      const { serializedPlan, planningMs } = JSON.parse(result.stdout.toString("utf8")) as {
+        serializedPlan: string;
+        planningMs: number;
+      };
+      expect(Number.isFinite(planningMs)).toBe(true);
+      expect(planningMs).toBeGreaterThanOrEqual(0);
+      times.push(planningMs);
+      outputs.push(Buffer.from(serializedPlan, "utf8"));
     }
     expect(new Set(outputs.map((output) => output.toString("utf8"))).size).toBe(1);
     expect(outputs[0].byteLength).toBeLessThan(1024 * 1024);
