@@ -21,6 +21,10 @@ Per [the domain's test-hook posture](./index.md#^updates-test-hooks):
 - **`TV_TEST_VERSION`** (server) — overrides the update-domain release version, consulted **exactly when the stamp is absent** (`__TV_VERSION__` undefined — that is, only when running from source, because `packages/cli/build.mjs` always defines it in a published build and the define short-circuits before any env read; without the hook an unstamped run resolves `0.0.0` per the stamp-only rule). Release builds are therefore inert to it by construction, with no runtime build-type check to maintain. ^hook-server-version
 - **`TV_TEST_WEB_VERSION`** (web bundle, build-time) — when set in the environment of a `vite build`, the version define stamps this value instead of the workspace `package.json` version. Production publishing never sets it, so the default is the finalized workspace version; tests use it to control the stamp at the real build boundary. ^hook-web-version
 
+## Fixture isolation
+
+The exact-count connection case in `packages/server/test/events.test.ts` runs an unstamped development server with `TV_TEST_VERSION=0.0.0` and no nonempty `TV_UPDATE_CHANNEL_URL`. These test-scoped inputs use the production [development-version suppression](../../../specs/arch/updates/update-channel.md#^dev-version-no-poll), and are restored after server disposal. The strict one-message assertion remains; it does not claim that a polling server never broadcasts later status messages. Real HTTP polling and subsequent real WebSocket status broadcasts remain covered by [the update-channel proof](./update-channel.md#^t-relay-broadcast).
+
 ## Assertions
 
 ### Test assertions
