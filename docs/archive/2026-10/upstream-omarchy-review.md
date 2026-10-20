@@ -1,3 +1,5 @@
+> **Archived 2026-10 from PR #23.** This report informed an observation-only upstream review proposal; source integration and compatibility acceptance remain outstanding. This coherent review records the complete relevant-path inventory and its relationship to Linux desktop compatibility work. The body below is unchanged from its working state and is a clue to the change, not a record of it.
+
 # Omarchy compatibility update for review
 
 Observed default branch `quattro`: `3ac43659dcbf88e84d951e3ce979b48a60a7d1f2`. Stable release `v4.0.6`: `237f1b4071a0bff2296c6d740ba2b9fd695ebfa0`, replacing observed stable `v4.0.4` at `c668141e9c42b13c80c9ca4ea108e11708c5e8a5`. Recorded baseline remains `902fd8aebd98b6eedaa58276886a2f9f2876755f`; compatibility-reviewed SHA remains null.
