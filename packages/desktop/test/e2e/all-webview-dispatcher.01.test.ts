@@ -121,26 +121,6 @@ async function clickInWebview(app: ElectronApplication, selector: string): Promi
   }, selector);
 }
 
-async function realClickInWebview(
-  app: ElectronApplication,
-  selector: string,
-  button: "left" | "middle" = "left",
-): Promise<void> {
-  await app.evaluate(async ({ webContents }, { targetSelector, button }) => {
-    const contents = webContents.getAllWebContents().find((candidate) => candidate.getType() === "webview");
-    if (!contents) throw new Error("No webview found");
-    const point = (await contents.executeJavaScript(`(() => {
-      const element = document.querySelector(${JSON.stringify(targetSelector)});
-      if (!element) throw new Error("Target not found");
-      const rect = element.getBoundingClientRect();
-      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
-    })()`)) as { x: number; y: number };
-    contents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
-    contents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button, clickCount: 1 });
-    contents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button, clickCount: 1 });
-  }, { targetSelector: selector, button });
-}
-
 async function cmdOrCtrlClickInWebview(app: ElectronApplication, selector: string): Promise<void> {
   await app.evaluate(async ({ webContents }, targetSelector) => {
     const contents = webContents.getAllWebContents().find((candidate) => candidate.getType() === "webview");
@@ -283,9 +263,9 @@ test.describe("Electron all-webview dispatcher", () => {
       })).toEqual([]);
       expect(await webviewURL(app)).toBe(initialURL);
 
-      await realClickInWebview(app, "#application-link");
-      await realClickInWebview(app, "#scripted-application-link");
-      await realClickInWebview(app, "#application-link", "middle");
+      await clickVisibleWebviewLink(app, page, "#application-link");
+      await clickVisibleWebviewLink(app, page, "#scripted-application-link");
+      await clickVisibleWebviewLink(app, page, "#application-link", "middle");
       await expect.poll(() => app.evaluate(() => {
         return (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog ?? [];
       }), { timeout: 15_000 }).toEqual([
@@ -297,7 +277,7 @@ test.describe("Electron all-webview dispatcher", () => {
       expect(await webviewURL(app)).toBe(initialURL);
       expect((await navigationRecord(page, artifactID))?.entries ?? []).toEqual([]);
 
-      await realClickInWebview(app, "#script-link");
+      await clickVisibleWebviewLink(app, page, "#script-link");
       await expect.poll(() => app.evaluate(async ({ webContents }) => {
         const contents = webContents.getAllWebContents().find((candidate) => candidate.getType() === "webview");
         if (!contents) throw new Error("No webview found");
@@ -320,7 +300,7 @@ test.describe("Electron all-webview dispatcher", () => {
           event.preventDefault();
         });
       });
-      await realClickInWebview(app, "#blob-download");
+      await clickVisibleWebviewLink(app, page, "#blob-download");
       await expect.poll(() => app.evaluate(() => {
         return (globalThis as typeof globalThis & {
           __televisionDownloadLog?: Array<{ filename: string; url: string }>;
@@ -336,7 +316,7 @@ test.describe("Electron all-webview dispatcher", () => {
         if (!contents) throw new Error("No webview found");
         await contents.executeJavaScript(`document.querySelector("#file-link").addEventListener("click", () => { document.body.dataset.fileClicked = "true"; })`);
       });
-      await realClickInWebview(app, "#file-link");
+      await clickVisibleWebviewLink(app, page, "#file-link");
       await expect.poll(() => app.evaluate(async ({ webContents }) => {
         const contents = webContents.getAllWebContents().find((candidate) => candidate.getType() === "webview");
         if (!contents) throw new Error("No webview found");
@@ -444,8 +424,8 @@ test.describe("Electron all-webview dispatcher", () => {
         (globalThis as typeof globalThis & { __televisionExternalOpenLog?: string[] }).__televisionExternalOpenLog = [];
       });
 
-      await realClickInWebview(app, "#application-link");
-      await realClickInWebview(app, "#scripted-application-link");
+      await clickVisibleWebviewLink(app, page, "#application-link");
+      await clickVisibleWebviewLink(app, page, "#scripted-application-link");
 
       await page.waitForTimeout(250);
       expect(await app.evaluate(() => {

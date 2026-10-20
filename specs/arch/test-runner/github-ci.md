@@ -2,7 +2,7 @@
 
 # GitHub Actions CI
 
-GitHub Actions validates every ready pull request targeting `main` or `integration/**`, and every push to those branches. Draft pull requests skip the validation graph, including the `e2e-required` join; marking one ready starts validation. Shared-branch policy comes from the [contribution workflow](../../spec-workflow.md#^shared-branch-workflow). The CI workflow fans test suites out across parallel jobs and gates mergeable changes on the result. Ordinary test jobs restore an exact-keyed dependency cache that is equivalent to a clean install, e2e shards restore one image-bound archive containing those dependencies and the Playwright Chromium and Firefox browsers, and workspace builds happen once before their outputs fan out. This contract prevents each job from repeating dependency, browser, system-library, and workspace-build setup.
+When repository Actions is enabled, GitHub Actions validates every ready pull request targeting `main` or `integration/**`, and every push to those branches. Draft pull requests skip the validation graph, including the `e2e-required` join; marking one ready starts validation. Shared-branch policy comes from the [contribution workflow](../../spec-workflow.md#^shared-branch-workflow). The CI workflow fans test suites out across parallel jobs and gates mergeable changes on the result. Ordinary test jobs restore an exact-keyed dependency cache that is equivalent to a clean install, e2e shards restore one image-bound archive containing those dependencies and the Playwright Chromium and Firefox browsers, and workspace builds happen once before their outputs fan out. This contract prevents each job from repeating dependency, browser, system-library, and workspace-build setup.
 
 This spec is authoritative for how the GitHub Actions CI workflow (`.github/workflows/ci.yml`) cancels superseded PR runs and sets up and executes test jobs: the dependency-install contract, the browser-environment contract, the build-once fan-out, cleanup/leak-detection tool prerequisites, and CI worker counts. The repository's Node/npm values and `.nvmrc` selector are owned by [arch/node-versions.md](../node-versions.md). The canonical command surface is [test-runner.md](./test-runner.md) (which also owns the CI retry contract); the per-worker shard runner CI invokes is [sharded-execution.md](./sharded-execution.md); surface builds are declared in [test-registry.md](./test-registry.md).
 
@@ -12,9 +12,11 @@ The developer-to-CI reuse path starts with a normal `npm run verify -- blaxel`. 
 
 GitHub CI is the other eligible attestation source. Its `attest-write` job sets `TV_TEST_REF_PUBLICATION` from the workflow's same-repository/fork classification and invokes the CI writer only after the complete graph and strict join pass. The writer command additionally requires `GITHUB_ACTIONS=true`, workflow `CI`, job `attest-write`, and `TV_TEST_REF_PUBLICATION=required`; a developer shell, an individual `provider=local` test job, and a fork context cannot use this path.
 
+The intentionally disabled-Actions `Gberfield/television` fork follows the [shared-branch workflow's local full-validation exception](../../spec-workflow.md#^fork-disabled-actions-validation). That exception does not treat an absent or skipped CI graph as a passing hosted run, and leaves this spec's CI-specific operational validation and attestation boundaries intact.
+
 ## Superseded pull request runs
 
-A new CI run for the same pull request cancels its superseded run. Runs for different pull requests are independent; push and manual runs are not cancelled or serialized by this PR concurrency policy. The complete required-check graph remains the validation requirement for the head commit of a ready pull request. ^gha-pr-concurrency
+A new CI run for the same pull request cancels its superseded run. Runs for different pull requests are independent; push and manual runs are not cancelled or serialized by this PR concurrency policy. Except for the explicitly scoped [disabled-Actions fork case](../../spec-workflow.md#^fork-disabled-actions-validation), the complete required-check graph remains the validation requirement for the head commit of a ready pull request. ^gha-pr-concurrency
 
 ## Dependency install: exact-key caching of the install's full effect
 

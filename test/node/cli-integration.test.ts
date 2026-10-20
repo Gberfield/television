@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -108,9 +108,13 @@ describe("CLI node integration artifact workflow", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    for (const processHandle of processes.splice(0).reverse()) await processHandle.dispose();
-    for (const server of servers.splice(0)) await server.dispose();
-    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    try {
+      for (const processHandle of processes.splice(0).reverse()) await processHandle.dispose();
+      for (const server of servers.splice(0)) await server.dispose();
+      for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("round-trips pointer artifacts through the real CLI, server, and proxy", async () => {
@@ -717,6 +721,10 @@ describe("CLI node integration artifact workflow", () => {
 
 
   it("broadcasts CLI-created artifacts to multiple real /events websocket clients", async () => {
+    // Keep this stream assertion independent of update-feed broadcasts.
+    // update-channel.seam.test.ts covers their real HTTP/WebSocket delivery.
+    vi.stubEnv("TV_TEST_VERSION", "0.0.0");
+    vi.stubEnv("TV_UPDATE_CHANNEL_URL", "");
     const storagePath = mkdtempSync(path.join(os.tmpdir(), "television-cli-node-storage-"));
     const targetDir = mkdtempSync(path.join(os.tmpdir(), "television-cli-node-target-"));
     dirs.push(storagePath, targetDir);

@@ -55,7 +55,7 @@ describe("getElectronE2EInvocation", () => {
     });
     expect(getElectronE2EInvocation({ useXvfb: true }, ["--reporter=json"])).toEqual({
       command: "xvfb-run",
-      args: ["-a", "npx", "playwright", "test", "--config=packages/desktop/playwright.config.ts", "--reporter=json"],
+      args: ["-a", "-s", "-screen 0 3200x2400x24", "npx", "playwright", "test", "--config=packages/desktop/playwright.config.ts", "--reporter=json"],
     });
   });
 });
