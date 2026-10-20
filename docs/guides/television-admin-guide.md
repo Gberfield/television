@@ -235,8 +235,9 @@ The Television desktop app is a native Mac app that shows Television in its own 
 
 Download this fork's portable archive or AppImage from
 `https://github.com/Gberfield/television/releases/tag/linux-stable`. As of October
-8, 2026, the published client is 1.4.27; the source workspace remains pinned to
-1.4.23. Use the selected release's checksums/build information when verifying a
+8, 2026, the published client is 1.4.27. This source workspace is 1.5.4 for the
+reviewed artifact-isolation version transition; source changes do not publish or
+install a desktop release. Use the selected release's checksums/build information when verifying a
 payload. These are downstream releases, not official Telepath Mac or npm releases.
 
 For the portable archive, extract the whole folder, open **Install

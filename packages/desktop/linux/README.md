@@ -8,9 +8,9 @@ local or remote Linux/macOS machine; the client connects to that server.
 The [fork Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable)
 publishes desktop **1.4.27** as a portable archive and AppImage, with
 `SHA256SUMS`, `latest-linux.yml`, and `build-info.json`. This is a downstream
-release. The repository workspace remains **1.4.23** even though newer upstream
-source has been integrated; building main does not reproduce the published
-1.4.27 payload automatically. The [fork overview](../../../docs/guides/fork-overview.md)
+release. This source workspace is **1.5.4**, including the reviewed artifact-isolation
+version transition; building this source does not reproduce the published
+1.4.27 payload or publish a new release automatically. The [fork overview](../../../docs/guides/fork-overview.md)
 explains the separate versions and recent changes.
 
 ## Install and connect

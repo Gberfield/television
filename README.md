@@ -76,7 +76,7 @@ To run the Television server as a persistent system service:
 tv serve --persist
 ```
 
-These commands build this fork's source workspace, currently pinned to 1.4.23;
+These commands build this fork's source workspace, version 1.5.4;
 the published Linux desktop 1.4.27 is a separately stamped distribution. To build
 the client, follow [Linux packaging](packages/desktop/linux/README.md#build-and-verification).
 Updating source or the server does not publish or install a desktop release.

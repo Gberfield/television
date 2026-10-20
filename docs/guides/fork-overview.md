@@ -7,10 +7,13 @@ upstream changes through reviewed proposals.
 
 ## Versions and distribution
 
-As of October 8, 2026, the source workspace and desktop package manifests are
-pinned to **1.4.23**. Main contains upstream source through
-`c7545d6770fa4f5741d611314e4710939e28ebb7` (upstream's 1.4.26 bump), with the fork's
-version pins retained. The independently published **Linux desktop 1.4.27** uses
+This source workspace and its desktop package manifest are **1.5.4**, incorporating
+upstream source through `a8e73fbf5eecfb27172ff5928ffb71f0c6844368`. The reviewed
+manual version transition from 1.4.23 satisfies the new artifact-isolation desktop
+floor of 1.5.0; it does not publish or install a release. Automatic tracking still
+preserves fork versions outside an explicitly reviewed transition.
+
+The independently published **Linux desktop 1.4.27** uses
 the earlier accepted tray source `43391068b7d90c933ace1042a03ca56e1f5b5f29` with
 distribution stamps. A larger release number does not mean it contains every
 later source commit.
