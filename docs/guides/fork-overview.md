@@ -90,6 +90,41 @@ discovery. The retained hosted proposal writer preserves fork versions and never
 merges Omarchy history; using it requires separate authority. Owner review,
 compatibility acceptance, release and installation remain separate steps.
 
+## Source validation and operational holds
+
+The proposed fork-policy exceptions in PR #25 permit source integration under the
+[disabled-Actions conditions](../../specs/spec-workflow.md#^fork-disabled-actions-validation).
+They do not activate the changed paths. The new policy wording remains subject to
+human review before merge; PR #25 is draft and unmerged.
+
+The affected source incorporates upstream
+`a8e73fbf5eecfb27172ff5928ffb71f0c6844368`. Retain the following holds with that code
+and reassess them after further changes. Close each hold only with evidence for
+the affected code, recorded in the PR and this handoff. Ordinary local tests
+cannot close these external boundaries.
+
+| Held operation | Affected paths | Required evidence before use or release |
+| --- | --- | --- |
+| Changed Mac app distribution or ordinary use | `packages/desktop/`, desktop bridge/IPC, update runtime and upgrade gate | Unreleased signed candidate or signed test build on a supported Mac: every applicable install, license, Updates and Bridge/IPC check; supported-Mac local verification for the ToDesktop migration. Linux package builds and Electron tests supply none of this evidence. |
+| Changed live Blaxel operations | `scripts/run-blaxel-testshards.mjs`, `scripts/manage-blaxel-testshards.mjs`, `scripts/test/` remote checkout/runtime/planning paths | Authorized real API/transport runs covering leasing, locking, architecture, setup, logs and results; fresh workers for provisioning/runtime changes; two repositories on reused workers for selection changes, retaining dependency-cache evidence; a planned suite for plan transfer. Pool-discovery live listing remains unverified. |
+| Ordinary GitHub Actions execution | `.github/workflows/`, `.github/actions/`, CI planning/build-output/cache paths | Authorized isolated miss/hit/induced-failure validation against the workflow versions on every ref to be activated, plus required-check context evidence on the first production run. Keep tracking and release workflows outside the validation window. Actions remains disabled until separate activation authority. |
+| Linux desktop release, installation and compatibility acceptance | Linux packaging/launcher, sandbox, tray/Hyprland lifecycle, updater and Omarchy integration | Actual packaged/graphical acceptance, supported compositor/session matrix, physical input/GPU/mixed-output scaling and production-updater checks. The disposable VM never became ready; no graphical or physical pass is recorded. This separate compatibility hold is unchanged by the policy proposal. |
+
+PR #25 retains the exact validation records. The complete local gate at
+`5bc665b4f153fb8fa260c3825ccbef4153754f9e` passed 22 surfaces with 3,809 tests
+passed, 32 existing skips and no recovered flakes, failures, process leaks or
+canonical infrastructure failures. The feed-sidecar BrokenPipe diagnostics are
+retained separately. That gate predates the new policy proposal; a changed final
+pushed head containing current main still requires full canonical verification
+before merge. No durable testpass or compatibility acceptance was published.
+
+These are human-governed operational holds, not runtime interlocks. Source merge
+approval grants no permission to build, install, deploy, publish, access paid
+services, alter shared pools or credentials, enable Actions or dispatch workflows.
+An explicitly authorized validation exercise may execute the held candidate to
+obtain evidence; passing local tests is not that authorization. Support is
+cancelled, and existing installed applications, services and desktops stay intact.
+
 ## Scope of these docs
 
 Personal dashboards, Calendar receivers, Obsidian/LLM Wiki artifacts and host

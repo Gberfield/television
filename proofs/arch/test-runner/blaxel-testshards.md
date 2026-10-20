@@ -16,6 +16,8 @@ Repository selection composes several pieces across clean seams. A contract test
 
 Pool discovery also has a contract test that runs the shared discovery helper used by the pool manager and coordinator with the installed Blaxel SDK against a loopback HTTP server returning authored paginated sandbox responses. The SDK builds requests and handles pages through its native-fetch path over loopback HTTP. This proves page traversal, label filtering and deployed-only filtering; production HTTP/2 transport, real authentication and service compatibility are covered by live evidence: a read-only multi-page listing and the required live Blaxel run.
 
+The [fork timing exception](../../../specs/arch/test-runner/blaxel-testshards.md#^blaxel-fork-deferred-checks) changes when live evidence is due for locally validated source integration, not what it proves. Review confirms the disabled-Actions fork conditions, exact local validation record and maintained operational hold. All live boundary gaps described here remain open until the authorized real-provider checks pass, before ordinary Blaxel use. A targeted shard still cannot prove the planned-suite handoff. This procedural decision removes no assertions and orders no text-mirroring test.
+
 ## Test hooks
 
 
