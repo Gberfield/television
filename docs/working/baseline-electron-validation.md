@@ -15,3 +15,9 @@ The application-link test now uses the existing trusted embedder gesture helper,
 The controller retains original failures, temporary diagnostics, normalized runner records, and raw DPR1/DPR2 screenshots outside this checkout. Diagnostic source, fallbacks, and capture barriers were removed. No product behavior, test expectations, workflow permissions, retries, or skips changed.
 
 Independent spec, proof, and whole implementation review converged with gpt-6-astra at xhigh. Human spec acceptance and committed-tree full verification remain separate gates; the checks above do not establish merge readiness. This working record remains with the unfinished contribution.
+
+## Follow-up after the first full check
+
+`npm run verify` on clean commit `f8c44c7e9df23b02556505a2cbd441cbfc0f8c41` completed all 23 surfaces: 3,365 passed, 2 failed, 32 skipped, with one recovered browser flake and zero process leaks or infrastructure failures. Electron passed all 76 executed cases again. One failure was a second, stale Xvfb-argument expectation in the Node suite; this follow-up aligns that assertion with the already-reviewed screen contract. Its canonical targeted file now passes all 8 cases.
+
+The other full-run failure was the server-events test’s assumption that no update-driven status broadcast arrives during its 50 ms observation window. The owning Node rerun subsequently exposed the same assumption in its CLI event-broadcast case. Both reproduce on the exact base with a controlled 25 ms update-feed response, as does the earlier ACP silence test. These are preserved baseline findings outside the five-case Electron repair scope. No server test or product behavior was changed here, and no green full gate is claimed. Human review and broader verification remain outstanding.
