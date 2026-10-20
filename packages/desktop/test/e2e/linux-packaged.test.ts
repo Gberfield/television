@@ -23,7 +23,7 @@ const requireSandbox = process.env.TV_LINUX_REQUIRE_SANDBOX === "1";
 test.skip(process.platform !== "linux" || !packageDir, "Requires the actual built Linux package");
 
 test("packaged Linux client authenticates, renders artifacts, applies native appearance and retains its default profile", async () => {
-  const backend = process.env.WAYLAND_DISPLAY ? "wayland" : "x11";
+  const backend = process.env.TV_OZONE_PLATFORM || (process.env.WAYLAND_DISPLAY ? "wayland" : "x11");
   const temporary = mkdtempSync(path.join(os.tmpdir(), "tv-packaged-"));
   const config = path.join(temporary, "config"); mkdirSync(config);
   const server = await startConnectTestServer({ bundledViews: true });
