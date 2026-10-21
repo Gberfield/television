@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -133,11 +133,11 @@ function fakeEnvironment(overrides: Partial<CLIEnvironment> = {}): Partial<CLIEn
       disable: vi.fn(async () => ({ state: "opted-out", reason: null, guidPresent: true, region: "us" })),
       enable: vi.fn(async () => ({ state: "active", reason: null, guidPresent: true, region: "us" })),
     },
-    health: vi.fn(async () => ({ status: "ok", bindAddresses: ["127.0.0.1"], port: 32848 })),
+    health: vi.fn(async () => ({ status: "ok", bindAddresses: ["127.0.0.1"], origins: ["http://127.0.0.1:32848"], port: 32848 })),
   };
   return {
     createClient: vi.fn(() => client as any),
-    createServer: vi.fn(() => ({ start: vi.fn(async function (this: any) { return this; }), dispose: vi.fn(async () => {}), getBaseURL: vi.fn(() => "http://127.0.0.1:3000"), getBaseURLs: vi.fn(() => ["http://127.0.0.1:3000"]), getAuthToken: vi.fn(() => "token") }) as any),
+    createServer: vi.fn(() => ({ start: vi.fn(async function (this: any) { return this; }), dispose: vi.fn(async () => {}), getListeningPort: vi.fn(() => 3000), getOrigins: vi.fn(() => ["http://127.0.0.1:3000"]), getAuthToken: vi.fn(() => "token") }) as any),
     createDaemon: vi.fn(() => ({ install: vi.fn(async () => {}), uninstall: vi.fn(async () => {}), status: vi.fn(async () => ({ installed: false, running: false })) })),
     resolveStaticDir: () => undefined,
     resolveCanonicalDir: () => undefined,
@@ -145,6 +145,7 @@ function fakeEnvironment(overrides: Partial<CLIEnvironment> = {}): Partial<CLIEn
     resolveOnboardingContentPath: () => undefined,
     resolveBundledThemesPath: () => undefined,
     resolveBundledSkillsRoot: () => undefined,
+    resolveSdkDir: () => undefined,
     runSkillsInstaller: vi.fn(async () => {}),
     emitSkillInstalledTelemetry: vi.fn(async () => {}),
     onSignal: vi.fn(),
@@ -158,7 +159,7 @@ describe("CLI connect links", () => {
   function peers() {
     const authenticated = fakeEnvironment().createClient!("http://localhost:43123");
     const unauthenticated = fakeEnvironment().createClient!("http://localhost:43123");
-    const health = vi.spyOn(authenticated, "health").mockResolvedValue({ status: "ok", bindAddresses: ["127.0.0.1"], port: 43123 });
+    const health = vi.spyOn(authenticated, "health").mockResolvedValue({ status: "ok", bindAddresses: ["127.0.0.1"], origins: ["http://127.0.0.1:43123"], port: 43123 });
     const authenticatedGet = vi.spyOn(authenticated.display, "get");
     const unauthenticatedGet = vi.spyOn(unauthenticated.display, "get");
     const createClient = vi.fn<CLIEnvironment["createClient"]>()
@@ -187,15 +188,16 @@ describe("CLI connect links", () => {
   });
 
   it.each([
-    { configAuth: false, requiresToken: true, homeToken: "  live-token\n", addresses: ["127.0.0.1", "100.64.0.7"] },
-    { configAuth: true, requiresToken: false, homeToken: "leftover-token\n", addresses: ["0.0.0.0"] },
-    { configAuth: false, requiresToken: false, homeToken: "leftover-token\n", addresses: ["127.0.0.1"] },
-    { configAuth: true, requiresToken: false, homeToken: undefined, addresses: ["127.0.0.1"] },
-  ])("uses live auth=$requiresToken and health addresses despite config auth=$configAuth", async ({ configAuth, requiresToken, homeToken, addresses }) => {
+    { configAuth: false, requiresToken: true, homeToken: "  live-token\n", bindAddresses: ["127.0.0.1", "100.64.0.7"], origins: ["http://127.0.0.1:43123", "http://100.64.0.7:43123"] },
+    // A wildcard listener's origins are the machine's addresses; links print those, never 0.0.0.0.
+    { configAuth: true, requiresToken: false, homeToken: "leftover-token\n", bindAddresses: ["0.0.0.0"], origins: ["http://127.0.0.1:43123", "http://192.168.1.20:43123", "http://100.64.0.7:43123"] },
+    { configAuth: false, requiresToken: false, homeToken: "leftover-token\n", bindAddresses: ["127.0.0.1"], origins: ["http://127.0.0.1:43123"] },
+    { configAuth: true, requiresToken: false, homeToken: undefined, bindAddresses: ["127.0.0.1"], origins: ["http://127.0.0.1:43123"] },
+  ])("uses live auth=$requiresToken and health addresses despite config auth=$configAuth", async ({ configAuth, requiresToken, homeToken, bindAddresses, origins }) => {
     const home = temporaryHome({ port: 43200, auth: configAuth });
     if (homeToken !== undefined) writeToken(home, homeToken);
     const { createClient, health, authenticatedGet, unauthenticatedGet } = peers();
-    health.mockResolvedValue({ status: "ok", bindAddresses: addresses, port: 43123 });
+    health.mockResolvedValue({ status: "ok", bindAddresses, origins, port: 43123 });
     if (requiresToken) unauthenticatedGet.mockRejectedValue(unauthorized());
     const stdout = new BufferOutput();
     const stderr = new BufferOutput();
@@ -203,7 +205,7 @@ describe("CLI connect links", () => {
     expect(createClient.mock.calls).toEqual([["http://localhost:43200", homeToken?.trim()], ["http://localhost:43200", undefined]]);
     expect(health.mock.invocationCallOrder[0]).toBeLessThan(authenticatedGet.mock.invocationCallOrder[0]!);
     expect(authenticatedGet.mock.invocationCallOrder[0]).toBeLessThan(unauthenticatedGet.mock.invocationCallOrder[0]!);
-    expect(stdout.toString()).toBe(addresses.map((address) => `http://${address}:43123${requiresToken ? "/?token=live-token" : ""}\n`).join(""));
+    expect(stdout.toString()).toBe(origins.map((origin) => `${origin}${requiresToken ? "/?token=live-token" : ""}\n`).join(""));
     expect(stderr.toString()).toBe("");
   });
 
@@ -268,15 +270,136 @@ describe("CLI connect links", () => {
     if (caller === "foreground") {
       const server = env.createServer!({} as any);
       server.getAuthToken = () => token;
-      server.getBaseURLs = () => ["http://127.0.0.1:43123"];
-      ({ exitCode } = await runForegroundServe(["--home", home, "serve"], { stdout, stderr, createServer: () => server }));
+      server.getOrigins = () => ["http://127.0.0.1:43123"];
+      ({ exitCode } = await runForegroundServe(["--home", home, "serve", ...(isTTY === true ? [] : ["--print-links"])], { stdout, stderr, createServer: () => server }));
     } else {
-      exitCode = await runCLI(["--home", home, ...(caller === "persisted" ? ["serve", "--persist"] : ["links"])], env);
+      exitCode = await runCLI(["--home", home, ...(caller === "persisted" ? ["serve", "--persist", ...(isTTY === true ? [] : ["--print-links"])] : ["links"])], env);
     }
     expect(exitCode).toBe(0);
     const formatted = isTTY === true ? `\u001B]8;;${url}\u001B\\${url}\u001B]8;;\u001B\\` : url;
     const heading = caller === "persisted" ? "Television service installed." : "Television server running.";
     expect(stdout.toString()).toBe(caller === "links" ? `${formatted}\n` : `${heading}\nOpen Television:\n  ${formatted}\n`);
+  });
+});
+
+// [[arch/cli/index.md#^cli-startup-links-contract]] and [[arch/cli/index.md#^cli-persist-links-contract]]
+describe("startup links", () => {
+  const hint = (command: string) => `Run \`${command}\` to print the links that open Television.`;
+  const link = (url: string) => `\u001B]8;;${url}\u001B\\${url}\u001B]8;;\u001B\\`;
+  const ORIGINS = ["http://127.0.0.1:43123", "http://192.168.1.20:43123"];
+
+  function fakeServer() {
+    return {
+      start: vi.fn(async function (this: unknown) { return this; }),
+      dispose: vi.fn(async () => {}),
+      getListeningPort: vi.fn(() => 43123),
+      getOrigins: vi.fn(() => ORIGINS),
+      getAuthToken: vi.fn(() => "token-123"),
+    } as any;
+  }
+
+  /** Runs foreground serve until its startup output is written, then stops it, returning what it wrote. */
+  async function startup(argv: string[], overrides: Partial<CLIEnvironment> = {}): Promise<{ stdout: string; stderr: string }> {
+    const stdout = (overrides.stdout as BufferOutput | undefined) ?? new BufferOutput();
+    const stderr = new BufferOutput();
+    const result = await runForegroundServe(argv, { createServer: () => fakeServer(), ...overrides, stdout, stderr });
+    expect(result.exitCode).toBe(0);
+    return { stdout: stdout.toString(), stderr: stderr.toString() };
+  }
+
+  it("prints the server's origins as links on a terminal", async () => {
+    const terminal = Object.assign(new BufferOutput(), { isTTY: true });
+    const { stdout } = await startup(["--home", temporaryHome({ port: 43123 }), "serve"], { stdout: terminal });
+    expect(stdout).toBe(`Television server running.\nOpen Television:\n${ORIGINS.map((origin) => `  ${link(`${origin}/?token=token-123`)}\n`).join("")}`);
+  });
+
+  it("prints only the tv links line without a terminal, carrying --home when given and --port under config port 0, and no token", async () => {
+    const home = temporaryHome({ port: 0 });
+    const piped = await startup(["--home", home, "serve"]);
+    expect(piped.stdout).toBe(`Television server running.\n${hint(`tv --home ${home} links --port 43123`)}\n`);
+    expect(`${piped.stdout}${piped.stderr}`).not.toContain("token-123");
+
+    // A home selected without --home needs neither option, and a nonzero config port needs no --port.
+    const operatingSystemHome = temporaryDirectory("television-startup-os-home-");
+    writeFileSync(path.join(operatingSystemHome, ".tv-home"), `${temporaryHome({ port: 43123 })}\n`);
+    expect((await startup(["serve"], { resolveHomeDir: () => operatingSystemHome })).stdout).toBe(`Television server running.\n${hint("tv links")}\n`);
+
+    // A home a shell would split or unquote is single-quoted.
+    const awkward = path.join(temporaryDirectory("television-startup-awkward-"), "tv home's");
+    mkdirSync(awkward);
+    writeConfig(awkward, { port: 43123 });
+    const quoted = `'${awkward.replaceAll("'", "'\\''")}'`;
+    expect((await startup(["--home", awkward, "serve"])).stdout).toBe(`Television server running.\n${hint(`tv --home ${quoted} links`)}\n`);
+  });
+
+  it("does not list --print-links in help", async () => {
+    const stdout = new BufferOutput();
+    expect(await runCLI(["serve", "--help"], fakeEnvironment({ stdout, stderr: new BufferOutput() }))).toBe(0);
+    expect(stdout.toString()).not.toContain("print-links");
+  });
+
+  it("persisted serve prints the tv links line without a terminal once the service answers, and reads no links", async () => {
+    const home = temporaryHome({ port: 43123 });
+    const stdout = new BufferOutput();
+    const client = fakeEnvironment().createClient!("http://localhost:43123");
+    const health = vi.spyOn(client, "health");
+    const display = vi.spyOn(client.display, "get");
+    const env = fakeEnvironment({ stdout, stderr: new BufferOutput(), createDaemon: fakeDaemon().createDaemon, createClient: vi.fn(() => client) });
+    expect(await runCLI(["--home", home, "serve", "--persist"], env)).toBe(0);
+    expect(stdout.toString()).toBe(`Television service installed.\n${hint(`tv --home ${home} links`)}\n`);
+    expect(env.createClient).toHaveBeenCalledTimes(1);
+    expect(health).toHaveBeenCalledTimes(1);
+    expect(display).not.toHaveBeenCalled();
+  });
+
+  describe("persisted serve on a terminal", () => {
+    beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] }); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    /**
+     * Runs persisted serve on a terminal whose service's health fails `failures` times first, or whose `display`
+     * request for the links never settles, advancing the clock until the command ends.
+     */
+    async function persistOnTerminal(failures: number, stalled?: "display"): Promise<{ stdout: string; healthCalls: number; elapsed: number }> {
+      const home = temporaryHome({ port: 43123, auth: false });
+      const stdout = Object.assign(new BufferOutput(), { isTTY: true });
+      const client = fakeEnvironment().createClient!("http://localhost:43123");
+      const unreachable = new RequestError("fetch failed", { serverURL: "http://localhost:43123" });
+      let calls = 0;
+      vi.spyOn(client, "health").mockImplementation(async () => {
+        calls += 1;
+        if (calls <= failures) throw unreachable;
+        return { status: "ok", bindAddresses: ["0.0.0.0"], origins: ORIGINS, port: 43123 } as any;
+      });
+      if (stalled === "display") vi.spyOn(client.display, "get").mockImplementation(() => new Promise<never>(() => {}));
+      const started = Date.now();
+      let settled = false;
+      const run = runCLI(["--home", home, "serve", "--persist"], fakeEnvironment({ stdout, stderr: new BufferOutput(), createDaemon: fakeDaemon().createDaemon, createClient: vi.fn(() => client) }))
+        .finally(() => { settled = true; });
+      for (let step = 0; step < 400 && !settled; step += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+        await vi.advanceTimersByTimeAsync(50);
+      }
+      expect(settled, "persisted serve still waiting after 20 seconds").toBe(true);
+      expect(await run).toBe(0);
+      return { stdout: stdout.toString(), healthCalls: calls, elapsed: Date.now() - started };
+    }
+
+    it("asks the service's health every 250 milliseconds until it answers, then prints its links", async () => {
+      const { stdout, healthCalls, elapsed } = await persistOnTerminal(2);
+      expect(healthCalls).toBe(3);
+      expect(elapsed).toBeGreaterThanOrEqual(500);
+      expect(stdout).toBe(`Television service installed.\nOpen Television:\n${ORIGINS.map((origin) => `  ${link(origin)}\n`).join("")}`);
+    });
+
+    // A health call that never answers is the 15-second timeout's case, which exits 1.
+    it("ends a links call that never settles at the 15-second deadline, and prints the tv links line", async () => {
+      const { stdout, healthCalls, elapsed } = await persistOnTerminal(0, "display");
+      expect(healthCalls).toBe(1);
+      expect(elapsed).toBeGreaterThanOrEqual(15_000);
+      expect(elapsed).toBeLessThan(15_500);
+      expect(stdout).toMatch(/^Television service installed\.\nRun `tv --home .+ links` to print the links that open Television\.\n$/);
+    });
   });
 });
 
@@ -386,8 +509,12 @@ describe("CLI Slice 1 artifact command surface", () => {
       "create-url-artifact",
       "update-artifact",
       "delete-artifact",
+      "reposition-artifact",
+      "move-artifact",
       "get-artifact",
       "list-artifacts",
+      "share-artifact",
+      "unshare-artifact",
       "create-channel",
       "update-channel",
       "remove-channel",
@@ -403,6 +530,7 @@ describe("CLI Slice 1 artifact command surface", () => {
       "stop",
       "links",
       "status",
+      "resource",
     ]);
   });
 
@@ -424,6 +552,10 @@ describe("CLI Slice 1 artifact command surface", () => {
     expect(stdout.toString()).toMatch(/^  --home <path>\s/m);
     expect(stdout.toString()).toMatch(/^  config\s/m);
     expect(stdout.toString()).toMatch(/^  themes-path\s/m);
+    // Help wraps long descriptions, so only the start of resource's is compared.
+    expect(stdout.toString()).toMatch(/^  resource\s+Read, write and watch/m);
+    expect(stdout.toString()).toMatch(/^  share-artifact\s/m);
+    expect(stdout.toString()).toMatch(/^  unshare-artifact\s/m);
     expect(stdout.toString()).toContain(
       "The main skill is `television` — keep its guidance available for channels, lifecycle, the `tv` CLI, artifact workflow, and theming.",
     );
@@ -567,7 +699,8 @@ describe("CLI Slice 1 artifact command surface", () => {
 
     const focusStdout = new BufferOutput();
     expect(await runCLI(["help", "focus-artifact"], fakeEnvironment({ stdout: focusStdout, stderr: new BufferOutput() }))).toBe(0);
-    expect(focusStdout.toString()).toMatch(/select\s+the artifact's tab page/);
+    expect(focusStdout.toString()).toMatch(/select\s+the artifact and switch/);
+    expect(focusStdout.toString()).not.toMatch(/\bpages?\b/i);
     expect(focusStdout.toString()).toMatch(/switch to its channel when needed/);
     expect(focusStdout.toString()).not.toMatch(/scroll|highlight/i);
 
@@ -1696,7 +1829,7 @@ describe("CLI Slice 1 artifact command surface", () => {
     expect(unknown.toString()).toContain(SKILL_POINTER);
   });
 
-  it("serve --persist installs a daemon with PATH, telemetry and update-channel env, and every connect URL", async () => {
+  it("serve --persist installs a daemon with PATH, telemetry and update-channel env, and prints the tv links line without a terminal", async () => {
     const stdout = new BufferOutput();
     const stderr = new BufferOutput();
     const home = temporaryHome({ port: 43123, listen: ["100.64.0.7"], installedByAgent: " Claude Code " });
@@ -1750,10 +1883,7 @@ describe("CLI Slice 1 artifact command surface", () => {
     expect(uninstall).not.toHaveBeenCalled();
     const output = stdout.toString();
     expect(() => JSON.parse(output)).toThrow();
-    expect(output).toContain("Television service installed.");
-    expect(output).toContain("http://127.0.0.1:43123/?token=");
-    expect(output).toContain("http://100.64.0.7:43123/?token=");
-    expect(output).not.toContain("\u001B");
+    expect(output).toBe(`Television service installed.\nRun \`tv --home ${home} links\` to print the links that open Television.\n`);
     expect(stderr.toString()).toBe("");
   });
 
@@ -1845,8 +1975,8 @@ describe("CLI Slice 1 artifact command surface", () => {
     const output = stdout.toString();
     expect(() => JSON.parse(output)).toThrow();
     expect(output).toContain("Television service installed.");
-    expect(output).toContain("http://0.0.0.0:43123/?token=");
-    expect(output).not.toContain("\u001B");
+    expect(output).toContain("to print the links that open Television.");
+    expect(output).not.toContain("?token=");
     const installRecord = readLogRecords(home).find((record) => record.msg === "persisted service installed");
     expect(installRecord?.execStart).toEqual([process.execPath, process.argv[1] ?? "tv", "--home", home, "serve"]);
     expect(installRecord?.env).toEqual({
@@ -2150,9 +2280,7 @@ describe("CLI Slice 1 artifact command surface", () => {
       expect(createClient).toHaveBeenCalledWith("http://localhost:43123", "token-123");
       expect(health).toHaveBeenCalledTimes(3);
       expect(stdoutAtEachHealthCall).toEqual(["", "", ""]);
-      expect(stdout.toString()).toBe(
-        "Television service installed.\nOpen Television:\n  http://127.0.0.1:43123/?token=token-123\n  http://100.64.0.7:43123/?token=token-123\n",
-      );
+      expect(stdout.toString()).toBe(`Television service installed.\nRun \`tv --home ${home} links\` to print the links that open Television.\n`);
       expect(stderr.toString()).toBe("");
       expect(readLogRecords(home).filter((record) => record.msg === "persisted service did not respond")).toEqual([]);
 
@@ -2307,7 +2435,7 @@ describe("CLI Slice 1 artifact command surface", () => {
     const start = vi.fn(async function (this: any) { return this; });
     let finishDispose!: () => void;
     const dispose = vi.fn(async () => new Promise<void>((resolve) => { finishDispose = resolve; }));
-    const createServer = vi.fn(() => ({ start, dispose, getBaseURL: vi.fn(() => "http://localhost:43123"), getBaseURLs: vi.fn(() => ["http://localhost:43123"]), getAuthToken: vi.fn(() => "token-123") }) as any);
+    const createServer = vi.fn(() => ({ start, dispose, getListeningPort: vi.fn(() => 43123), getOrigins: vi.fn(() => ["http://localhost:43123"]), getAuthToken: vi.fn(() => "token-123") }) as any);
     const previousLaunchMode = process.env.TELEVISION_LAUNCH_MODE;
     process.env.TELEVISION_LAUNCH_MODE = "daemon";
 
@@ -2321,6 +2449,7 @@ describe("CLI Slice 1 artifact command surface", () => {
         resolveBundledViewsPath: () => "/tmp/television-views",
         resolveOnboardingContentPath: () => "/tmp/television-onboarding",
         resolveBundledThemesPath: () => "/tmp/television-themes",
+        resolveSdkDir: () => "/tmp/television-sdk",
         onSignal: vi.fn((signal, handler) => { signalHandlers.set(signal, handler); }),
       }));
       await vi.waitFor(() => {
@@ -2330,7 +2459,9 @@ describe("CLI Slice 1 artifact command surface", () => {
           bundledViewsPath: "/tmp/television-views",
           onboardingContentPath: "/tmp/television-onboarding",
           bundledThemesPath: "/tmp/television-themes",
+          sdkDir: "/tmp/television-sdk",
           launchMode: "daemon",
+          resourceBindings: false,
         }));
         expect([...signalHandlers.keys()].sort()).toEqual(["SIGINT", "SIGTERM"]);
       });
@@ -2351,7 +2482,7 @@ describe("CLI Slice 1 artifact command surface", () => {
   // Specs: [[arch/cli/index.md#^0ffa0d0d|foreground serve port zero]], [[arch/cli/index.md#^cli-port-zero-warning-text|port zero warning text]].
   it("serve warns but supports explicit port 0 in the foreground", async () => {
     expect(PORT_ZERO_WARNING).toBe(
-      "WARNING: config port 0 lets the operating system choose this server's port. Commands that contact this server must pass --port <port>, using the port from the startup URL.",
+      "WARNING: config port 0 lets the operating system choose this server's port. Commands that contact this server must pass --port <port>, using the port in the startup output.",
     );
     for (const [config, warns] of [[{ port: 0 }, true], [{ port: 43124 }, false]] as const) {
       const stdout = new BufferOutput();
@@ -2360,11 +2491,11 @@ describe("CLI Slice 1 artifact command surface", () => {
       let stderrWhenCreated: string | undefined;
       const start = vi.fn(async function (this: any) { return this; });
       const dispose = vi.fn(async () => {});
-      const getBaseURL = vi.fn(() => "http://127.0.0.1:43124");
-      const getBaseURLs = vi.fn(() => ["http://127.0.0.1:43124"]);
+      const getListeningPort = vi.fn(() => 43124);
+      const getOrigins = vi.fn(() => ["http://127.0.0.1:43124"]);
       const createServer = vi.fn(() => {
         stderrWhenCreated = stderr.toString();
-        return { start, dispose, getBaseURL, getBaseURLs, getAuthToken: vi.fn(() => "token-123") } as any;
+        return { start, dispose, getListeningPort, getOrigins, getAuthToken: vi.fn(() => "token-123") } as any;
       });
       const runPromise = runCLI(["--home", temporaryHome(config), "serve"], fakeEnvironment({ stdout, stderr, createServer, onSignal: vi.fn((signal, handler) => { signalHandlers.set(signal, handler); }) }));
       await vi.waitFor(() => { expect(createServer).toHaveBeenCalledWith(expect.objectContaining({ port: config.port })); });
@@ -2387,17 +2518,17 @@ describe("CLI Slice 1 artifact command surface", () => {
     const unconfiguredHome = path.join(temporaryDirectory("television-cli-serve-"), "no-config-home");
     const cases: Array<{ argv: string[]; launchMode: string | undefined; expected: Record<string, unknown> }> = [
       {
-        argv: ["--home", relativeHome, "serve"],
+        argv: ["--home", relativeHome, "serve", "--print-links"],
         launchMode: "unexpected-value",
         expected: { home: configuredHome, listen: ["127.0.0.2"], port: 43123, auth: true, installedByAgent: " Claude Code ", launchMode: "cli" },
       },
       {
-        argv: ["--home", unconfiguredHome, "serve"],
+        argv: ["--home", unconfiguredHome, "serve", "--print-links"],
         launchMode: undefined,
         expected: { home: unconfiguredHome, listen: [], port: 32848, auth: true, launchMode: "cli" },
       },
       {
-        argv: ["--home", unconfiguredHome, "serve"],
+        argv: ["--home", unconfiguredHome, "serve", "--print-links"],
         launchMode: "daemon",
         expected: { home: unconfiguredHome, listen: [], port: 32848, auth: true, launchMode: "daemon" },
       },
@@ -2412,8 +2543,8 @@ describe("CLI Slice 1 artifact command surface", () => {
         const createServer = vi.fn(() => ({
           start: vi.fn(async function (this: any) { return this; }),
           dispose: vi.fn(async () => {}),
-          getBaseURL: vi.fn(() => "http://127.0.0.1:43123"),
-          getBaseURLs: vi.fn(() => ["http://127.0.0.1:43123"]),
+          getListeningPort: vi.fn(() => 43123),
+          getOrigins: vi.fn(() => ["http://127.0.0.1:43123"]),
           getAuthToken: vi.fn(() => "token-123"),
         }) as any);
         const runPromise = runCLI(argv, fakeEnvironment({ stdout, stderr: new BufferOutput(), createServer, onSignal: vi.fn((signal, handler) => { signalHandlers.set(signal, handler); }) }));
@@ -2437,14 +2568,14 @@ describe("CLI Slice 1 artifact command surface", () => {
     const signalHandlers = new Map<NodeJS.Signals, () => void>();
     const start = vi.fn(async function (this: any) { return this; });
     const dispose = vi.fn(async () => {});
-    const getBaseURL = vi.fn(() => "http://127.0.0.1:43123");
-    const getBaseURLs = vi.fn(() => ["http://127.0.0.1:43123"]);
+    const getListeningPort = vi.fn(() => 43123);
+    const getOrigins = vi.fn(() => ["http://127.0.0.1:43123"]);
     const getAuthToken = vi.fn(() => "token-123");
-    const createServer = vi.fn(() => ({ start, dispose, getBaseURL, getBaseURLs, getAuthToken }) as any);
+    const createServer = vi.fn(() => ({ start, dispose, getListeningPort, getOrigins, getAuthToken }) as any);
     const previousAgent = process.env.TELEVISION_ACP_AGENT;
     delete process.env.TELEVISION_ACP_AGENT;
 
-    const runPromise = runCLI(["serve"], fakeEnvironment({ stdout, stderr, createServer, onSignal: vi.fn((signal, handler) => { signalHandlers.set(signal, handler); }) }));
+    const runPromise = runCLI(["serve", "--print-links"], fakeEnvironment({ stdout, stderr, createServer, onSignal: vi.fn((signal, handler) => { signalHandlers.set(signal, handler); }) }));
     await vi.waitFor(() => { expect(createServer).toHaveBeenCalledWith(expect.not.objectContaining({ acpProfile: expect.anything() })); });
     signalHandlers.get("SIGTERM")?.();
     await expect(runPromise).resolves.toBe(0);
@@ -2496,7 +2627,26 @@ describe("CLI Slice 1 artifact command surface", () => {
 });
 
 const TOKENLESS_WARNING = "WARNING: running without an auth token. Tokenless mode is insecure for typical setups — be sure you mean to run without authentication. Run `tv config set auth true` and restart to require the bearer token.";
+// The warning with the bindings flag on (specs/product/cli.md#^cli-tokenless-bindings-sentence).
+const TOKENLESS_WARNING_WITH_BINDINGS = "WARNING: running without an auth token. Tokenless mode is insecure for typical setups — be sure you mean to run without authentication. Any client that can reach this server can also change which artifacts may use which resources. Run `tv config set auth true` and restart to require the bearer token.";
 const CONFIG_SET_RESTART_LINE = "Restart foreground `tv serve`, or rerun `tv serve --persist`, for a running server to use the new settings.";
+
+/** Every share command and every `tv resource` and `tv resource json` command the shipped CLI offers, with the other arguments it requires. */
+const RESOURCE_COMMANDS: string[][] = [
+  ["share-artifact", "--id", "artifact-1", "--access", "read"],
+  ["unshare-artifact", "--id", "artifact-1"],
+  ["resource", "list"],
+  ["resource", "info", "01JBTASKS0000000000000000A"],
+  ["resource", "describe", "01JBTASKS0000000000000000A", "Tasks"],
+  ["resource", "destroy", "01JBTASKS0000000000000000A"],
+  ["resource", "events"],
+  ["resource", "json", "get", "--artifact", "artifact-1"],
+  ["resource", "json", "set", "--artifact", "artifact-1", "1"],
+  ["resource", "json", "update", "--resource", "01JBTASKS0000000000000000A", "{}"],
+  ["resource", "json", "push", "--artifact", "artifact-1", "list", "1"],
+  ["resource", "json", "remove", "--resource", "01JBTASKS0000000000000000A", "a"],
+  ["resource", "json", "watch", "--artifact", "artifact-1"],
+];
 
 /** Every command that contacts the server, with the other arguments it requires. */
 const SERVER_COMMANDS: string[][] = [
@@ -2504,6 +2654,8 @@ const SERVER_COMMANDS: string[][] = [
   ["create-url-artifact", "--channel", "screen-1", "--title", "U", "--url", "https://example.com", "--no-focus"],
   ["update-artifact", "--id", "artifact-1", "--title", "T"],
   ["delete-artifact", "--id", "artifact-1"],
+  ["reposition-artifact", "--id", "artifact-1", "--width", "500"],
+  ["move-artifact", "--id", "artifact-1", "--channel", "screen-1", "--no-focus"],
   ["get-artifact", "--id", "artifact-1"],
   ["list-artifacts"],
   ["create-channel", "--name", "New", "--no-focus"],
@@ -2519,6 +2671,7 @@ const SERVER_COMMANDS: string[][] = [
   ["telemetry", "disable"],
   ["status"],
   ["links"],
+  ...RESOURCE_COMMANDS,
 ];
 
 function fakeDaemon() {
@@ -2537,8 +2690,8 @@ async function runForegroundServe(argv: string[], overrides: Partial<CLIEnvironm
   const createServer = vi.fn((_options: Record<string, unknown>) => ({
     start: vi.fn(async function (this: any) { return this; }),
     dispose: vi.fn(async () => {}),
-    getBaseURL: vi.fn(() => "http://127.0.0.1:43123"),
-    getBaseURLs: vi.fn(() => ["http://127.0.0.1:43123"]),
+    getListeningPort: vi.fn(() => 43123),
+    getOrigins: vi.fn(() => ["http://127.0.0.1:43123"]),
     getAuthToken: vi.fn(() => "token-123"),
   }) as any);
   let settled = false;
@@ -2635,7 +2788,7 @@ describe("CLI homes and the config file", () => {
       const stderr = new BufferOutput();
       const env = fakeEnvironment({ stdout: new BufferOutput(), stderr });
       expect(await runCLI(["--home", portZeroHome, ...command], env), command.join(" ")).toBe(1);
-      expect(stderr.toString(), command.join(" ")).toContain(`requires --port because ${portZeroConfig} sets port 0. Pass the port from the Television server's startup URL.`);
+      expect(stderr.toString(), command.join(" ")).toContain(`requires --port because ${portZeroConfig} sets port 0. Pass the port from the Television server's startup output.`);
       expect(stderr.toString(), command.join(" ")).toContain(SKILL_POINTER);
       expect(env.createClient, command.join(" ")).not.toHaveBeenCalled();
     }
@@ -2663,6 +2816,15 @@ describe("CLI homes and the config file", () => {
         expect(stderr.toString()).toContain(SKILL_POINTER);
         expect(refusedEnv.createClient).not.toHaveBeenCalled();
       }
+    }
+
+    // The share and resource commands have no --server override either.
+    for (const command of RESOURCE_COMMANDS) {
+      const stderr = new BufferOutput();
+      const env = fakeEnvironment({ stdout: new BufferOutput(), stderr });
+      expect(await runCLI(["--home", nonzeroHome, ...command, "--server", "http://localhost:43200"], env), command.join(" ")).toBe(1);
+      expect(stderr.toString(), command.join(" ")).toContain("does not support --server");
+      expect(env.createClient, command.join(" ")).not.toHaveBeenCalled();
     }
 
     const invalidHome = temporaryHome({ port: "43123" });
@@ -3090,41 +3252,357 @@ describe("CLI homes and the config file", () => {
   });
 
   // Spec: [[arch/cli/index.md#^cli-tokenless-warnings|tokenless warnings]].
-  it("prints the tokenless warnings only when the config file turns authentication off", async () => {
-    const cases: Array<[Record<string, unknown>, string[]]> = [
-      [{ auth: false }, [TOKENLESS_WARNING]],
-      [{ auth: false, listen: ["100.64.0.7"] }, [TOKENLESS_WARNING, "Non-loopback listeners without auth: 100.64.0.7"]],
-      [{ auth: false, listen: ["0.0.0.0"] }, [TOKENLESS_WARNING, "Non-loopback listeners without auth: 0.0.0.0"]],
-      [{ listen: ["100.64.0.7"] }, []],
-      [{}, []],
-    ];
-    for (const [config, lines] of cases) {
-      const { exitCode, stderr } = await runForegroundServe(["--home", temporaryHome(config), "serve"]);
-      expect(exitCode).toBe(0);
-      expect(stderr.split("\n").filter(Boolean), JSON.stringify(config)).toEqual(lines);
+  it("prints the tokenless warnings only when the config file turns authentication off, with the sentence about bindings only when the bindings flag is on", async () => {
+    for (const [resourceBindings, warning] of [[false, TOKENLESS_WARNING], [true, TOKENLESS_WARNING_WITH_BINDINGS]] as const) {
+      const cases: Array<[Record<string, unknown>, string[]]> = [
+        [{ auth: false }, [warning]],
+        [{ auth: false, listen: ["100.64.0.7"] }, [warning, "Non-loopback listeners without auth: 100.64.0.7"]],
+        [{ auth: false, listen: ["0.0.0.0"] }, [warning, "Non-loopback listeners without auth: 0.0.0.0"]],
+        [{ listen: ["100.64.0.7"] }, []],
+        [{}, []],
+      ];
+      for (const [config, lines] of cases) {
+        // Without the environment's hook, the shipped flag applies.
+        const overrides = resourceBindings ? { resourceBindings } : {};
+        const { exitCode, stderr, createServer } = await runForegroundServe(["--home", temporaryHome(config), "serve"], overrides);
+        expect(exitCode).toBe(0);
+        expect(stderr.split("\n").filter(Boolean), `${JSON.stringify(config)} with the flag ${resourceBindings ? "on" : "off"}`).toEqual(lines);
+        expect(createServer).toHaveBeenCalledWith(expect.objectContaining({ resourceBindings }));
+      }
     }
   });
 
-  // Spec: [[arch/cli/index.md#^cli-persist-token-output|persisted connect URLs carry the home's token]].
-  it("serve --persist prints token-bearing URLs from the home's token file only when authentication is on", async () => {
+  // Spec: [[arch/cli/index.md#^cli-persist-token-output|persisted links carry the home's token]].
+  it("serve --persist creates the home's token before installing and prints its links with it only when authentication is on", async () => {
+    /** A terminal, and clients for a server that requires the token exactly when `requiresToken`. */
+    const onTerminal = (requiresToken: boolean) => {
+      const stdout = Object.assign(new BufferOutput(), { isTTY: true });
+      const authenticated = fakeEnvironment().createClient!("http://localhost:32848");
+      const unauthenticated = fakeEnvironment().createClient!("http://localhost:32848");
+      if (requiresToken) vi.spyOn(unauthenticated.display, "get").mockRejectedValue(new RequestError("Unauthorized", { serverURL: "http://localhost:32848", status: 401 }));
+      const createClient = vi.fn<CLIEnvironment["createClient"]>().mockReturnValueOnce(authenticated).mockReturnValueOnce(unauthenticated);
+      return { stdout, createClient };
+    };
+    const link = (url: string) => `\u001B]8;;${url}\u001B\\${url}\u001B]8;;\u001B\\`;
     const home = path.join(temporaryDirectory("television-cli-persist-token-"), "home");
     const tokenPath = path.join(home, "state", "token");
     const daemon = fakeDaemon();
     let tokenExistedAtInstall = false;
     daemon.install.mockImplementation(async () => { tokenExistedAtInstall = existsSync(tokenPath); });
-    const stdout = new BufferOutput();
-    expect(await runCLI(["--home", home, "serve", "--persist"], fakeEnvironment({ stdout, stderr: new BufferOutput(), createDaemon: daemon.createDaemon }))).toBe(0);
+    const authenticated = onTerminal(true);
+    expect(await runCLI(["--home", home, "serve", "--persist"], fakeEnvironment({ stdout: authenticated.stdout, stderr: new BufferOutput(), createDaemon: daemon.createDaemon, createClient: authenticated.createClient }))).toBe(0);
     expect(daemon.install).toHaveBeenCalledTimes(1);
     expect(tokenExistedAtInstall).toBe(true);
     const token = readFileSync(tokenPath, "utf8").trim();
     expect(token.length).toBeGreaterThan(0);
-    expect(stdout.toString()).toContain(`http://127.0.0.1:32848/?token=${token}`);
+    expect(authenticated.createClient.mock.calls[0]).toEqual(["http://localhost:32848", token]);
+    expect(authenticated.stdout.toString()).toBe(`Television service installed.\nOpen Television:\n  ${link(`http://127.0.0.1:32848/?token=${token}`)}\n`);
     expect(existsSync(path.join(home, "config.json"))).toBe(false);
 
-    const tokenlessHome = temporaryHome({ port: 43123, auth: false });
-    const tokenlessStdout = new BufferOutput();
-    expect(await runCLI(["--home", tokenlessHome, "serve", "--persist"], fakeEnvironment({ stdout: tokenlessStdout, stderr: new BufferOutput(), createDaemon: fakeDaemon().createDaemon }))).toBe(0);
-    expect(tokenlessStdout.toString()).toContain("http://127.0.0.1:43123");
-    expect(tokenlessStdout.toString()).not.toContain("?token=");
+    const tokenlessHome = temporaryHome({ port: 32848, auth: false });
+    const tokenless = onTerminal(false);
+    expect(await runCLI(["--home", tokenlessHome, "serve", "--persist"], fakeEnvironment({ stdout: tokenless.stdout, stderr: new BufferOutput(), createDaemon: fakeDaemon().createDaemon, createClient: tokenless.createClient }))).toBe(0);
+    expect(tokenless.stdout.toString()).toBe(`Television service installed.\nOpen Television:\n  ${link("http://127.0.0.1:32848")}\n`);
+  });
+});
+
+describe("page arrangement and moving commands", () => {
+  const size = { width: 760, height: 770 };
+  const page = (artifactIds: string[], fullScreen = false, pageSize = size) => ({
+    artifactIds,
+    geometry: { kind: "single" as const, full_screen: fullScreen },
+    size: { ...pageSize },
+  });
+  const channels = () => [
+    { id: "other-channel", name: "Other", layout: [page(["elsewhere"])] },
+    { id: "home-channel", name: "Home", layout: [page(["first"]), page(["middle", "companion"]), page(["last"], true)] },
+  ];
+
+  function arrange(overrides: Record<string, unknown> = {}) {
+    const stdout = new BufferOutput();
+    const stderr = new BufferOutput();
+    const base = fakeEnvironment().createClient!("", "") as any;
+    const client = {
+      ...base,
+      channels: {
+        ...base.channels,
+        list: vi.fn(async () => ({ channels: channels() })),
+        update: vi.fn(async (input: any) => ({ channel: { id: input.channelID, name: "Home", layout: input.layout } })),
+      },
+      artifacts: {
+        ...base.artifacts,
+        move: vi.fn(async (input: any) => ({ outcome: "moved", artifactID: input.artifactID, channelID: input.channelID })),
+      },
+      ...overrides,
+    };
+    const createClient = vi.fn(() => client);
+    return { stdout, stderr, client, env: fakeEnvironment({ stdout, stderr, createClient }) };
+  }
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-request
+  it.each([
+    ["--width", ["--width", "612.5"], [page(["first"]), page(["middle", "companion"], false, { width: 612.5, height: 770 }), page(["last"], true)]],
+    ["--height", ["--height", "400"], [page(["first"]), page(["middle", "companion"], false, { width: 760, height: 400 }), page(["last"], true)]],
+    ["--full-screen", ["--full-screen"], [page(["first"]), page(["middle", "companion"], true), page(["last"], true)]],
+    ["--position first", ["--position", "1"], [page(["middle", "companion"]), page(["first"]), page(["last"], true)]],
+    ["--position last", ["--position", "3"], [page(["first"]), page(["last"], true), page(["middle", "companion"])]],
+    ["--position unchanged", ["--position", "2"], [page(["first"]), page(["middle", "companion"]), page(["last"], true)]],
+  ])("reposition-artifact %s changes only that page and submits the channel's layout once", async (_name, options, expectedLayout) => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "middle", ...options], env)).toBe(0);
+    expect(client.channels.list).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledWith({ channelID: "home-channel", layout: expectedLayout });
+    expect(stdout.toString()).toBe("Artifact middle repositioned.\n");
+    expect(stderr.toString()).toBe("");
+  });
+
+  it("reposition-artifact --no-full-screen leaves full-screen without changing the size", async () => {
+    const { client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "last", "--no-full-screen"], env)).toBe(0);
+    expect(client.channels.update).toHaveBeenCalledWith({
+      channelID: "home-channel",
+      layout: [page(["first"]), page(["middle", "companion"]), page(["last"])],
+    });
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-invalid
+  it.each([
+    ["no change option", []],
+    ["both full-screen flags", ["--full-screen", "--no-full-screen"]],
+    ["a zero width", ["--width", "0"]],
+    ["a negative height", ["--height", "-5"]],
+    ["a non-numeric width", ["--width", "wide"]],
+    ["a non-finite height", ["--height", "Infinity"]],
+    ["position zero", ["--position", "0"]],
+    ["a negative position", ["--position", "-1"]],
+    ["a fractional position", ["--position", "1.5"]],
+    ["a non-numeric position", ["--position", "first"]],
+    ["a position beyond the page count", ["--position", "4"]],
+  ])("reposition-artifact rejects %s without updating", async (_name, options) => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "middle", ...options], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-not-found
+  it("reposition-artifact reports an artifact that no channel holds", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    expect(await runCLI(["reposition-artifact", "--id", "nowhere", "--width", "500"], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain("Artifact not found: nowhere");
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-artifact-stale
+  it("reposition-artifact reports a channel that changed before its update", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    client.channels.update.mockRejectedValueOnce(new RequestError(
+      "Channel home-channel layout cannot add, remove, split, merge, or regroup page membership",
+      { serverURL: "http://localhost:43123", status: 409 },
+    ));
+    expect(await runCLI(["reposition-artifact", "--id", "middle", "--width", "500"], env)).toBe(1);
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(
+      "Channel home-channel changed before artifact middle could be repositioned, so nothing changed. Run the command again.",
+    );
+    expect(stderr.toString()).not.toMatch(/\bpages?\b/i);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-arrangement-wording
+  it("reposition-artifact and move-artifact help and messages do not say page", async () => {
+    const texts: string[] = [];
+    for (const argv of [["reposition-artifact", "--help"], ["help", "move-artifact"]]) {
+      const { stdout, env } = arrange();
+      expect(await runCLI(argv, env)).toBe(0);
+      texts.push(stdout.toString());
+    }
+    for (const options of [["--width", "500"], ["--position", "4"], []]) {
+      const { stdout, stderr, env } = arrange();
+      await runCLI(["reposition-artifact", "--id", "middle", ...options], env);
+      texts.push(stdout.toString(), stderr.toString());
+    }
+    const moved = arrange();
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", "--no-focus"], moved.env)).toBe(0);
+    texts.push(moved.stdout.toString());
+    const notOnChannel = arrange();
+    await runCLI(["reposition-artifact", "--id", "middle", "--before", "elsewhere"], notOnChannel.env);
+    texts.push(notOnChannel.stderr.toString());
+    for (const command of ["create-path-artifact", "create-url-artifact"]) {
+      const { stdout, env } = arrange();
+      expect(await runCLI([command, "--help"], env)).toBe(0);
+      const placementLines = stdout.toString().split("\n").filter((line) => /--(before|after)\b/.test(line));
+      expect(placementLines).toHaveLength(2);
+      texts.push(...placementLines);
+    }
+
+    expect(texts.join("\n")).toContain("reposition-artifact");
+    for (const text of texts) expect(text).not.toMatch(/\bpages?\b/i);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-move-artifact
+  it("move-artifact requires exactly one focus directive", async () => {
+    for (const options of [[], ["--focus-artifact", "--no-focus"]]) {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", ...options], env)).toBe(1);
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    }
+  });
+
+  it.each([
+    ["moved", "--no-focus", "Artifact middle moved to channel other-channel.\n", false],
+    ["moved", "--focus-artifact", "Artifact middle moved to channel other-channel.\n", true],
+    ["unchanged", "--no-focus", "Artifact middle is already on channel other-channel.\n", false],
+    ["unchanged", "--focus-artifact", "Artifact middle is already on channel other-channel.\n", true],
+    ["repositioned", "--no-focus", "Artifact middle repositioned on channel other-channel.\n", false],
+    ["repositioned", "--focus-artifact", "Artifact middle repositioned on channel other-channel.\n", true],
+  ])("move-artifact reports outcome %s with %s", async (outcome, directive, expected, focuses) => {
+    const { stdout, stderr, client, env } = arrange();
+    client.artifacts.move.mockResolvedValue({ outcome, artifactID: "middle", channelID: "other-channel" });
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "other-channel", directive], env)).toBe(0);
+    expect(client.artifacts.move).toHaveBeenCalledTimes(1);
+    expect(client.artifacts.move).toHaveBeenCalledWith({ artifactID: "middle", channelID: "other-channel" });
+    if (focuses) expect(client.display.focus).toHaveBeenCalledWith({ artifactID: "middle" });
+    else expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe(expected);
+    expect(stderr.toString()).toBe("");
+  });
+
+  it.each([
+    "Channel not found: missing-channel",
+    "Artifact not found: missing-artifact",
+  ])("move-artifact prints the server's not-found message %s", async (message) => {
+    const { stdout, stderr, client, env } = arrange();
+    client.artifacts.move.mockRejectedValue(new RequestError(message, { serverURL: "http://localhost:43123", status: 404 }));
+    expect(await runCLI(["move-artifact", "--id", "middle", "--channel", "missing-channel", "--focus-artifact"], env)).toBe(1);
+    expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // Placement before or after another artifact (specs/product/cli.md#^cli-before-after).
+  const placementChannels = () => [
+    { id: "other-channel", name: "Other", layout: [page(["elsewhere"])] },
+    { id: "home-channel", name: "Home", layout: [page(["a"]), page(["b"]), page(["c"]), page(["d"])] },
+  ];
+
+  function arrangePlacement() {
+    const arranged = arrange();
+    arranged.client.channels.list.mockImplementation(async () => ({ channels: placementChannels() }));
+    return arranged;
+  }
+
+  const createArgs = {
+    "create-path-artifact": ["create-path-artifact", "--channel", "home-channel", "--title", "Note", "--path", "/notes/note.md", "--no-focus"],
+    "create-url-artifact": ["create-url-artifact", "--channel", "home-channel", "--title", "Link", "--url", "https://example.com", "--no-focus"],
+    "move-artifact": ["move-artifact", "--id", "middle", "--channel", "home-channel", "--no-focus"],
+  } as const;
+
+  // proofs/arch/cli/index.md#^cli-t-placement-request
+  it.each([
+    ["create-path-artifact", "--before", "before"],
+    ["create-path-artifact", "--after", "after"],
+    ["create-url-artifact", "--before", "before"],
+    ["create-url-artifact", "--after", "after"],
+    ["move-artifact", "--before", "before"],
+    ["move-artifact", "--after", "after"],
+  ] as const)("%s passes %s to the server", async (command, option, key) => {
+    const { stderr, client, env } = arrange();
+    expect(await runCLI([...createArgs[command], option, "b"], env)).toBe(0);
+    expect(stderr.toString()).toBe("");
+    const call = command === "move-artifact" ? client.artifacts.move : client.artifacts.create;
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(call.mock.calls[0][0]).toEqual(expect.objectContaining({ [key]: "b" }));
+    expect(call.mock.calls[0][0]).not.toHaveProperty(key === "before" ? "after" : "before");
+  });
+
+  it.each(["create-path-artifact", "create-url-artifact", "move-artifact"] as const)(
+    "%s without --before or --after sends neither",
+    async (command) => {
+      const { client, env } = arrange();
+      expect(await runCLI([...createArgs[command]], env)).toBe(0);
+      const call = command === "move-artifact" ? client.artifacts.move : client.artifacts.create;
+      expect(call.mock.calls[0][0]).not.toHaveProperty("before");
+      expect(call.mock.calls[0][0]).not.toHaveProperty("after");
+    },
+  );
+
+  it.each(["create-path-artifact", "create-url-artifact", "move-artifact"] as const)(
+    "%s rejects --before with --after without a client call",
+    async (command) => {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI([...createArgs[command], "--before", "a", "--after", "b"], env)).toBe(1);
+      expect(client.artifacts.create).not.toHaveBeenCalled();
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain("accepts --before or --after, not both.");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    },
+  );
+
+  it.each(["--before", "--after"])(
+    "move-artifact rejects %s naming the moved artifact without a client call",
+    async (option) => {
+      const { stdout, stderr, client, env } = arrange();
+      expect(await runCLI(["move-artifact", "--id", "a", "--channel", "home-channel", option, "a", "--no-focus"], env)).toBe(1);
+      expect(client.artifacts.move).not.toHaveBeenCalled();
+      expect(stdout.toString()).toBe("");
+      expect(stderr.toString()).toContain("tv move-artifact cannot place artifact a before or after itself; name another artifact.");
+      expect(stderr.toString()).toContain(SKILL_POINTER);
+    },
+  );
+
+  it("create-url-artifact prints the server's placement error without focusing", async () => {
+    const { stdout, stderr, client, env } = arrange();
+    const message = "Artifact elsewhere is not on channel home-channel.";
+    client.artifacts.create = vi.fn(async () => {
+      throw new RequestError(message, { serverURL: "http://localhost:43123", status: 400 });
+    });
+    const argv = ["create-url-artifact", "--channel", "home-channel", "--title", "Link", "--url", "https://example.com", "--before", "elsewhere", "--focus-artifact"];
+    expect(await runCLI(argv, env)).toBe(1);
+    expect(client.display.focus).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-before-after
+  it.each([
+    ["b --after c", "b", ["--after", "c"], [page(["a"]), page(["c"]), page(["b"]), page(["d"])]],
+    ["b --before a", "b", ["--before", "a"], [page(["b"]), page(["a"]), page(["c"]), page(["d"])]],
+    ["c --after d", "c", ["--after", "d"], [page(["a"]), page(["b"]), page(["d"]), page(["c"])]],
+    ["c --before b", "c", ["--before", "b"], [page(["a"]), page(["c"]), page(["b"]), page(["d"])]],
+    ["b --before c, where it already is", "b", ["--before", "c"], [page(["a"]), page(["b"]), page(["c"]), page(["d"])]],
+    ["b --before d --width 500", "b", ["--before", "d", "--width", "500"], [page(["a"]), page(["c"]), page(["b"], false, { width: 500, height: 770 }), page(["d"])]],
+  ])("reposition-artifact %s places the artifact beside another", async (_name, id, options, expectedLayout) => {
+    const { stdout, stderr, client, env } = arrangePlacement();
+    expect(await runCLI(["reposition-artifact", "--id", id, ...options], env)).toBe(0);
+    expect(client.channels.update).toHaveBeenCalledTimes(1);
+    expect(client.channels.update).toHaveBeenCalledWith({ channelID: "home-channel", layout: expectedLayout });
+    expect(stdout.toString()).toBe(`Artifact ${id} repositioned.\n`);
+    expect(stderr.toString()).toBe("");
+  });
+
+  // proofs/arch/cli/index.md#^cli-t-reposition-placement-invalid
+  it.each([
+    ["--before with --after", ["--before", "a", "--after", "c"], null],
+    ["--position with --before", ["--position", "1", "--before", "a"], null],
+    ["--before naming itself", ["--before", "b"], null],
+    ["--before naming an artifact on another channel", ["--before", "elsewhere"], "Artifact elsewhere is not on channel home-channel."],
+    ["--after naming an artifact on no channel", ["--after", "nowhere"], "Artifact nowhere is not on channel home-channel."],
+  ])("reposition-artifact rejects %s placement without updating", async (_name, options, message) => {
+    const { stdout, stderr, client, env } = arrangePlacement();
+    expect(await runCLI(["reposition-artifact", "--id", "b", ...options], env)).toBe(1);
+    expect(client.channels.update).not.toHaveBeenCalled();
+    expect(stdout.toString()).toBe("");
+    if (message !== null) expect(stderr.toString()).toContain(message);
+    expect(stderr.toString()).toContain(SKILL_POINTER);
   });
 });

@@ -96,8 +96,7 @@ describe("test runner registry", () => {
       "unit:view-markdown",
       "unit:browser-app",
       "unit:skills",
-      "unit:skillbench",
-      "unit:staging",
+      "unit:frames",
     ]);
   });
 

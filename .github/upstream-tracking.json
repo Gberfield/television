@@ -5,7 +5,7 @@
     "repository": "telepath-computer/television",
     "branch": "main",
     "observed_sha": "a8e73fbf5eecfb27172ff5928ffb71f0c6844368",
-    "integrated_sha": "c7545d6770fa4f5741d611314e4710939e28ebb7",
+    "integrated_sha": "a8e73fbf5eecfb27172ff5928ffb71f0c6844368",
     "tested_sha": null
   },
   "omarchy": {
@@ -22,7 +22,7 @@
   },
   "policy": {
     "draft_only": true,
-    "fork_workspace_version": "1.4.23",
+    "fork_workspace_version": "1.5.4",
     "linux_release_feed": "https://github.com/Gberfield/television/releases/download/linux-stable/",
     "omarchy_history": "never_merge",
     "pr_creation_enabled": true

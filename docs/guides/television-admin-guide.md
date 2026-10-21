@@ -181,12 +181,12 @@ Showing the person their full connect link is expected and correct: it is how th
 
 A *connect link* is the one thing the person needs to open Television: the server's address with the token in it, such as `http://100.64.0.7:32848/?token=<token>`. The same link works in a browser and in the desktop app. Without a token, the link is the plain address.
 
-`tv links` prints the running server's connect links, one per line, one for each address it listens on. If the server isn't running, it prints none and says why.
+`tv links` prints the running server's connect links, one per line, one for each address the server can be reached at: `127.0.0.1` for localhost, each address it listens on, and, when it listens on every interface (`0.0.0.0`), each of the machine's addresses, such as its LAN and tailnet addresses. If the server isn't running, it prints none and says why. `tv serve` and `tv serve --persist` print the same links when run in a terminal. When their output goes anywhere else, such as to you or to a log, they print the `tv links` command to run instead, so that the token never lands in a log.
 
-The printed addresses are the server's own: `127.0.0.1` for localhost, and `0.0.0.0` when it listens on every interface. When the person reaches the server by a different address, give them the link with that address in place of the printed one, keeping the port and token exactly:
+Give the person the link whose address they can reach. When they reach the server by an address none of the links has, give them the link with that address in place of the printed one, keeping the port and token exactly:
 
 - through an SSH tunnel: `localhost`, opened on their computer, along with the `ssh -L` command they need to run first;
-- for a `0.0.0.0` listener, including inside Docker: the address by which they reach this machine or its Docker host, such as its LAN or tailnet address.
+- inside Docker, where the printed addresses are the container's own: the address by which they reach the Docker host, such as its LAN or tailnet address.
 
 #### The link must be exact
 
@@ -235,9 +235,16 @@ The Television desktop app is a native Mac app that shows Television in its own 
 
 Download this fork's portable archive or AppImage from
 `https://github.com/Gberfield/television/releases/tag/linux-stable`. As of October
-8, 2026, the published client is 1.4.27; the source workspace remains pinned to
-1.4.23. Use the selected release's checksums/build information when verifying a
+8, 2026, the published client is 1.4.27. This source workspace is 1.5.4 for the
+reviewed artifact-isolation version transition; source changes do not publish or
+install a desktop release. Use the selected release's checksums/build information when verifying a
 payload. These are downstream releases, not official Telepath Mac or npm releases.
+
+This source server requires desktop 1.5.0 or newer for artifact isolation. The
+listed Linux 1.4.27 client does not meet that floor. Do not pair its installation
+with an upgrade to this source server; use the web client until a compatible
+Linux desktop has passed acceptance and is available. This source change does
+not publish or install that desktop.
 
 For the portable archive, extract the whole folder, open **Install
 Television.desktop** (allow execution/trust when prompted), then launch
@@ -351,6 +358,10 @@ After the upgrade, open browser tabs reload themselves once when they reconnect;
 - **Listen addresses.** If `listen` holds a Tailscale or LAN address, check it is still this machine's address (section 2). If the set of addresses changes, the person may lose a way of reaching Television; tell them.
 - **`installedByAgent`.** If it is unset, set it (section 5).
 
+#### Artifacts that use browser storage
+
+Television 1.5.0 improved artifact security, and artifacts can no longer use browser storage (`localStorage`, `sessionStorage`, cookies, IndexedDB); what they saved there before can't be carried over. On an upgrade from an earlier version, check the HTML artifacts (`tv list-artifacts`) for those, and decide for each what to recommend: remove the saving, or move it to the artifact's JSON store (see the `television` skill). Tell the person in plain words, without technical terms, that improved security in Television changes how artifacts save data, which of their artifacts are affected, and how each will behave after the change.
+
 #### Moving from the npm desktop app to the downloaded app
 
 Desktop apps up to Television 1.3 were installed with the npm package `@telepath-computer/television-desktop` and started with `tv-desktop`. That package gets no more updates. A small number of people still use it. The downloaded app replaces it and keeps its saved server connection, so the person doesn't need to reconnect.
@@ -463,6 +474,7 @@ Work out, without involving the person:
 - **Where the skills are installed** (section 7).
 - **The settings the service will use**: work through the settings checks in section 7.
 - **An npm desktop app** installed on this machine (section 7).
+- **Artifacts that use browser storage**, if the installed version is earlier than 1.5.0 (section 7).
 
 ### 2. Confirm
 
@@ -471,7 +483,8 @@ Send one message, in plain words:
 - what you're about to do: upgrade Television from the installed version to the new one, and update its skills; Television will be unavailable for a few seconds and open windows reconnect by themselves;
 - in the rare cases where section 7 says the person's connection changes, that they'll need a new link;
 - anything that needs their decision, such as an outdated Node version;
-- if you found the npm desktop app on this machine, an offer to move them to the downloaded app.
+- if you found the npm desktop app on this machine, an offer to move them to the downloaded app;
+- if you found artifacts that use browser storage, what section 7 says to tell them.
 
 No telemetry notice. Then wait for their go-ahead.
 
@@ -482,12 +495,14 @@ No telemetry notice. Then wait for their go-ahead.
 3. Fix the settings you found in the check (section 7), then run `tv serve --persist`.
 4. Verify the running version matches the installed one (section 7).
 5. In the rare case that the person needs a new link (section 7), get it from `tv links` and verify it exactly as section 3 requires.
+6. If you found artifacts that use browser storage, change them as you said you would (section 7).
 
 ### 4. Report
 
 One short message: Television is upgraded, and to which version. Add only what the person needs to act on:
 
 - the steps to move off the npm desktop app, if that applies (section 7);
+- the artifacts you changed because they used browser storage, if any (section 7);
 - in the rare case they need a new connect link (section 7), the link, complete and verified, with how to use it: open it in a browser, or in the desktop app choose **Disconnect from Server** from the **Television** menu on Mac or the **File** menu on Linux and paste it; and that they can get it again by asking you or running `tv links` on this machine.
 
 ## Read this guide in full

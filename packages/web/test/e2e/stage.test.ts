@@ -985,6 +985,41 @@ test.describe("stage full-screen motion (^st-ac-fullscreen)", () => {
   });
 });
 
+test.describe("stage remote reorder (^st-ac-remote-reorder)", () => {
+  for (const [label, order] of [
+    ["a page crossing the selected page", ["artifact-b", "artifact-a", "artifact-c"]],
+    ["the selected page itself moving", ["artifact-a", "artifact-c", "artifact-b"]],
+  ] as const) {
+    test(`keeps the selected page selected and centred when ${label} arrives as a channel update`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await page.goto(FIXTURE);
+      await waitForStage(page, true);
+      await settleStage(page);
+      expect(Math.abs((await report(page)).selectedCenterOffset ?? Infinity)).toBeLessThan(1);
+
+      const observation = await startMotionObservation(page, ".stage");
+      await page.evaluate((nextOrder) => {
+        (window as unknown as { __stageFixture: { reorder(order: readonly string[]): void } }).__stageFixture.reorder(nextOrder);
+      }, order);
+      const motion = await observation.settle();
+      await settleStage(page);
+
+      // With real motion, the update plays neither the drag's displacement nor a selection crossing.
+      expect(motion.transitionEvents).toEqual([]);
+      expect(motion.animationEvents).toEqual([]);
+      expect(motion.webAnimations).toEqual([]);
+
+      expect(await page.evaluate(() =>
+        (window as unknown as { __stageFixture: { pageKeys(): string[] } }).__stageFixture.pageKeys()
+      )).toEqual(order);
+      const after = await report(page);
+      expect(after.selectedArtifactID).toBe("artifact-b");
+      expect(after.selectionCalls).toEqual([]);
+      expect(Math.abs(after.selectedCenterOffset ?? Infinity)).toBeLessThan(1);
+    });
+  }
+});
+
 test.describe("stage selection-only input (^st-ac-selection-only)", () => {
   test("wheel, Shift-wheel, and swipe-like ground input leave selection and documents unchanged", async ({ page }) => {
     await page.goto(FIXTURE);

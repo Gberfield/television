@@ -7,13 +7,22 @@ upstream changes through reviewed proposals.
 
 ## Versions and distribution
 
-As of October 8, 2026, the source workspace and desktop package manifests are
-pinned to **1.4.23**. Main contains upstream source through
-`c7545d6770fa4f5741d611314e4710939e28ebb7` (upstream's 1.4.26 bump), with the fork's
-version pins retained. The independently published **Linux desktop 1.4.27** uses
+This source workspace and its desktop package manifest are **1.5.4**, incorporating
+upstream source through `a8e73fbf5eecfb27172ff5928ffb71f0c6844368`. The reviewed
+manual version transition from 1.4.23 satisfies the new artifact-isolation desktop
+floor of 1.5.0; it does not publish or install a release. Automatic tracking still
+preserves fork versions outside an explicitly reviewed transition.
+
+The independently published **Linux desktop 1.4.27** uses
 the earlier accepted tray source `43391068b7d90c933ace1042a03ca56e1f5b5f29` with
 distribution stamps. A larger release number does not mean it contains every
 later source commit.
+
+This source server requires desktop **1.5.0 or newer** for artifact isolation.
+The published Linux **1.4.27** client is incompatible with that server version.
+Use the web client until a compatible Linux desktop has passed acceptance and
+is available. The prepared source 1.5.4 is not itself an accepted published
+desktop release; no installed server or client is changed by this draft.
 
 The [linux-stable release](https://github.com/Gberfield/television/releases/tag/linux-stable)
 holds versioned portable archives and AppImages, checksums, update metadata and
@@ -80,6 +89,42 @@ exact candidate revisions with the canonical runner and supports read-only local
 discovery. The retained hosted proposal writer preserves fork versions and never
 merges Omarchy history; using it requires separate authority. Owner review,
 compatibility acceptance, release and installation remain separate steps.
+
+## Source validation and operational holds
+
+The owner-reviewed fork-policy exceptions in PR #25 permit source integration under the
+[disabled-Actions conditions](../../specs/spec-workflow.md#^fork-disabled-actions-validation).
+They do not activate the changed paths. The owner accepted the new wording at
+`c45eabd7913c69fe1ba0ca513d32f2fed54decb6`; source merges and operational
+activation still require their own authority.
+
+The affected source incorporates upstream
+`a8e73fbf5eecfb27172ff5928ffb71f0c6844368`. Retain the following holds with that code
+and reassess them after further changes. Close each hold only with evidence for
+the affected code, recorded in the PR and this handoff. Ordinary local tests
+cannot close these external boundaries.
+
+| Held operation | Affected paths | Required evidence before use or release |
+| --- | --- | --- |
+| Changed Mac app distribution or ordinary use | `packages/desktop/`, desktop bridge/IPC, update runtime and upgrade gate | Unreleased signed candidate or signed test build on a supported Mac: every applicable install, license, Updates and Bridge/IPC check; supported-Mac local verification for the ToDesktop migration. Linux package builds and Electron tests supply none of this evidence. |
+| Changed live Blaxel operations | `scripts/run-blaxel-testshards.mjs`, `scripts/manage-blaxel-testshards.mjs`, `scripts/test/` remote checkout/runtime/planning paths | Authorized real API/transport runs covering leasing, locking, architecture, setup, logs and results; fresh workers for provisioning/runtime changes; two repositories on reused workers for selection changes, retaining dependency-cache evidence; a planned suite for plan transfer. Pool-discovery live listing remains unverified. |
+| Ordinary GitHub Actions execution | `.github/workflows/`, `.github/actions/`, CI planning/build-output/cache paths | Authorized isolated miss/hit/induced-failure validation against the workflow versions on every ref to be activated, plus required-check context evidence on the first production run. Keep tracking and release workflows outside the validation window. Actions remains disabled until separate activation authority. |
+| Linux desktop release, installation and compatibility acceptance | Linux packaging/launcher, sandbox, tray/Hyprland lifecycle, updater and Omarchy integration | Actual packaged/graphical acceptance, supported compositor/session matrix, physical input/GPU/mixed-output scaling and production-updater checks. The disposable VM never became ready; no graphical or physical pass is recorded. The [maintained matrix](linux-omarchy-acceptance.md) records the runnable handoff; this separate compatibility hold is unchanged by the source-validation exception. |
+
+PR #25 retains the exact validation records. The complete local gate at
+`5bc665b4f153fb8fa260c3825ccbef4153754f9e` passed 22 surfaces with 3,809 tests
+passed, 32 existing skips and no recovered flakes, failures, process leaks or
+canonical infrastructure failures. The feed-sidecar BrokenPipe diagnostics are
+retained separately. That historical gate predates the policy follow-up. Every changed final
+pushed head containing current main requires full canonical verification before
+merge; the PR records the latest exact-head result. No durable testpass or compatibility acceptance was published.
+
+These are human-governed operational holds, not runtime interlocks. Source merge
+approval grants no permission to build, install, deploy, publish, access paid
+services, alter shared pools or credentials, enable Actions or dispatch workflows.
+An explicitly authorized validation exercise may execute the held candidate to
+obtain evidence; passing local tests is not that authorization. Support is
+cancelled, and existing installed applications, services and desktops stay intact.
 
 ## Scope of these docs
 

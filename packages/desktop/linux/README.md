@@ -8,10 +8,18 @@ local or remote Linux/macOS machine; the client connects to that server.
 The [fork Linux release](https://github.com/Gberfield/television/releases/tag/linux-stable)
 publishes desktop **1.4.27** as a portable archive and AppImage, with
 `SHA256SUMS`, `latest-linux.yml`, and `build-info.json`. This is a downstream
-release. The repository workspace remains **1.4.23** even though newer upstream
-source has been integrated; building main does not reproduce the published
-1.4.27 payload automatically. The [fork overview](../../../docs/guides/fork-overview.md)
+release. This source workspace is **1.5.4**, including the reviewed artifact-isolation
+version transition; building this source does not reproduce the published
+1.4.27 payload or publish a new release automatically. The [fork overview](../../../docs/guides/fork-overview.md)
 explains the separate versions and recent changes.
+
+This source server requires desktop **1.5.0 or newer** for artifact isolation.
+The published **1.4.27** client linked below is blocked by that server's upgrade
+gate. Use
+the web client until a compatible Linux desktop has passed acceptance and is
+available; preparing source 1.5.4 does not publish or install one. Treat the
+1.4.27 download/install instructions below as instructions for that existing
+release, not a compatible pairing with this new source server.
 
 ## Install and connect
 
